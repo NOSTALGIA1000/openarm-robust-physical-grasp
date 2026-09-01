@@ -84,7 +84,22 @@ int main(int argc, const char **argv)
   auto telemetry = std::make_unique<mujoco_ros2_control::MujocoGraspTelemetry>(node);
   telemetry->init(mujoco_model);
 
-  // run main loop, target real-time simulation and 60 fps rendering with cameras around 6 hz
+  // Rendering and camera cadence are decimated independently of physics.
+  // Defaults reproduce the original hard-coded 60 Hz viewer / 6 Hz cameras.
+  double viewer_render_period = 1.0 / 60.0;
+  double camera_period = 1.0 / 6.0;
+  if (node->has_parameter("viewer_render_period"))
+  {
+    viewer_render_period = node->get_parameter("viewer_render_period").as_double();
+  }
+  if (node->has_parameter("camera_period"))
+  {
+    camera_period = node->get_parameter("camera_period").as_double();
+  }
+  RCLCPP_INFO(
+    node->get_logger(), "Viewer render period %.4f s sim, camera period %.4f s sim",
+    viewer_render_period, camera_period);
+
   mjtNum last_cam_update = mujoco_data->time;
   while (rclcpp::ok() && !rendering->is_close_flag_raised())
   {
@@ -93,16 +108,15 @@ int main(int argc, const char **argv)
     //  this loop will finish on time for the next frame to be rendered at 60 fps.
     //  Otherwise add a cpu timer and exit this loop when it is time to render.
     mjtNum simstart = mujoco_data->time;
-    while (mujoco_data->time - simstart < 1.0 / 60.0)
+    while (mujoco_data->time - simstart < viewer_render_period)
     {
       mujoco_control.update();
       telemetry->update(mujoco_model, mujoco_data);
     }
     rendering->update();
 
-    // Updating cameras at ~6 Hz
     // TODO(eholum): Break control and rendering into separate processes
-    if (simstart - last_cam_update > 1.0 / 6.0)
+    if (simstart - last_cam_update > camera_period)
     {
       cameras->update(mujoco_model, mujoco_data);
       last_cam_update = simstart;
