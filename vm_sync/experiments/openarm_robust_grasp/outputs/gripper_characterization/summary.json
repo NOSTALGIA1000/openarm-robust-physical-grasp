@@ -1,0 +1,20 @@
+{
+  "scene_path": "/home/nostalgia/openarm_ws/experiments/openarm_robust_grasp/assets/cube_lift_scene.xml",
+  "arm_name": "left",
+  "points": 9,
+  "settle_steps": 100,
+  "command_monotonic_increasing": true,
+  "inner_outer_distance_monotonic_nonincreasing": false,
+  "min_opposing_geom_center_distance_monotonic_nonincreasing": false,
+  "inner_outer_distance_reduction_m": -0.036142365300465086,
+  "min_opposing_geom_center_distance_reduction_m": -0.05271378695695955,
+  "closed_command": 0.0,
+  "open_command": 0.58905,
+  "closed_distance_m": 0.009055178757362791,
+  "open_distance_m": 0.06176896571432234,
+  "aperture_span_m": 0.05271378695695955,
+  "command_increases_aperture": true,
+  "distance_monotonic": true,
+  "geometric_motion_meaningful": true,
+  "geometric_closure_gate_passed": true
+}

@@ -1,0 +1,63 @@
+{
+  "conditional_lift_not_run_reason": "free_closure_not_run",
+  "control_count": 8,
+  "csv_sha256": {
+    "conditional_lift.csv": "eda6d0545afd41ff44dbd93fe6d8f7fd1a96a0675ee8c96548b6c16c3d7fca91",
+    "contact_controls.csv": "db904c31a7782f51d9396ccac5bd08e6cbcbd4c0a7d0aa709a77c796703ae452",
+    "fixed_closure.csv": "0051cfbebd9b8303217cf35050a2d17ae8efa70f4e82bd6df8adbf971a670f27",
+    "free_closure.csv": "eda6d0545afd41ff44dbd93fe6d8f7fd1a96a0675ee8c96548b6c16c3d7fca91"
+  },
+  "failure_branch": "fixed_mechanism_gate_failed",
+  "fixed_condition_count": 4,
+  "fixed_conditions": [
+    {
+      "bilateral_frames": 0,
+      "ik_success": true,
+      "max_consecutive_bilateral_positive_force_frames": 0,
+      "max_inner_normal_force_n": 0.0,
+      "max_outer_normal_force_n": 5752.860324051213,
+      "mechanism_gate_pass": false,
+      "placement": "current_waypoint",
+      "profile": "raw_full",
+      "sampled_frames": 2020
+    },
+    {
+      "bilateral_frames": 0,
+      "ik_success": true,
+      "max_consecutive_bilateral_positive_force_frames": 0,
+      "max_inner_normal_force_n": 0.0,
+      "max_outer_normal_force_n": 1316.7863724013357,
+      "mechanism_gate_pass": false,
+      "placement": "current_waypoint",
+      "profile": "calibrated",
+      "sampled_frames": 2020
+    },
+    {
+      "bilateral_frames": 0,
+      "ik_success": true,
+      "max_consecutive_bilateral_positive_force_frames": 0,
+      "max_inner_normal_force_n": 5708.199580902714,
+      "max_outer_normal_force_n": 0.0,
+      "mechanism_gate_pass": false,
+      "placement": "geometric_center",
+      "profile": "raw_full",
+      "sampled_frames": 2020
+    },
+    {
+      "bilateral_frames": 0,
+      "ik_success": true,
+      "max_consecutive_bilateral_positive_force_frames": 0,
+      "max_inner_normal_force_n": 1740.611552834511,
+      "max_outer_normal_force_n": 0.0,
+      "mechanism_gate_pass": false,
+      "placement": "geometric_center",
+      "profile": "calibrated",
+      "sampled_frames": 2020
+    }
+  ],
+  "fixed_frame_count": 8080,
+  "fixed_mechanism_gate_pass": false,
+  "free_closure_not_run_reason": "fixed_mechanism_gate_failed",
+  "measurement_gate_pass": true,
+  "protocol": "contact_formation_diagnostics_v1"
+}

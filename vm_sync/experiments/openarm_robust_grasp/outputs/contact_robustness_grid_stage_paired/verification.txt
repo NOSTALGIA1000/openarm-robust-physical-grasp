@@ -1,0 +1,23 @@
+OpenArm contact-robustness stage grid verification
+Date: 2026-08-13 Asia/Shanghai
+
+Pre-run test:
+  python3 -m pytest -q
+  21 passed in 53.40s
+
+Post-sync test:
+  python3 -m pytest -q
+  21 passed in 19.94s
+
+Data checks:
+  results.csv rows: 630
+  summary.json rows: 21
+  policy/noise conditions: 21, each with 30 trials
+  paired (noise, seed) groups: 210, each with 3 policies
+  unique (policy, noise, seed) rows: 630
+  stage fields present: yes
+  stage count additivity: pass
+  success-flag definitions: pass
+  negative contact counts: 0
+  non-finite numeric values: 0
+  old-field regression differences: 0 rows

@@ -1,0 +1,40 @@
+<!-- Experiment-owned scene copied from openarm_mujoco/v2/demo.xml.
+     The OpenArm model is included from the official installed assets, while
+     object parameters are tuned here for contact/lift experiments only. -->
+<mujoco model="openarm_bimanual cube lift experiment">
+  <visual>
+    <global offwidth="960" offheight="600"/>
+  </visual>
+
+  <option timestep="0.002" gravity="0 0 -9.81" cone="elliptic"/>
+
+  <asset>
+    <model name="cell" file="/home/nostalgia/openarm_ws/src/openarm_mujoco/v2/cell.xml"/>
+  </asset>
+
+  <worldbody>
+    <attach model="cell" prefix=""/>
+
+    <body name="orange_cube" pos="0.45 0.0 1.05">
+      <freejoint/>
+      <geom name="orange_cube_geom"
+            type="box"
+            size="0.023 0.023 0.023"
+            rgba="1.0 0.4 0.0 1"
+            mass="0.015"
+            friction="4 2 0.1"
+            solref="0.002 1"
+            solimp="0.95 0.99 0.001"
+            contype="1"
+            conaffinity="1"/>
+    </body>
+
+    <body name="black_frame" pos="0.47 0.15 1.005">
+      <geom type="box" pos="0 0 0.005"    size="0.07 0.07 0.005" rgba="0.1 0.1 0.1 1" contype="1" conaffinity="1"/>
+      <geom type="box" pos="0.065 0 0.02"  size="0.005 0.07 0.02" rgba="0.1 0.1 0.1 1" contype="1" conaffinity="1"/>
+      <geom type="box" pos="-0.065 0 0.02" size="0.005 0.07 0.02" rgba="0.1 0.1 0.1 1" contype="1" conaffinity="1"/>
+      <geom type="box" pos="0 0.065 0.02"  size="0.06 0.005 0.02" rgba="0.1 0.1 0.1 1" contype="1" conaffinity="1"/>
+      <geom type="box" pos="0 -0.065 0.02" size="0.06 0.005 0.02" rgba="0.1 0.1 0.1 1" contype="1" conaffinity="1"/>
+    </body>
+  </worldbody>
+</mujoco>

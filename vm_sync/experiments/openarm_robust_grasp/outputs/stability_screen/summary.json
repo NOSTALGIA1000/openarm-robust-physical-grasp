@@ -1,0 +1,61 @@
+{
+  "disturbance_eligible_count": 0,
+  "disturbance_survival_rate_among_eligible": null,
+  "disturbance_survival_success_count": 0,
+  "final_elevation_success_count": 0,
+  "hold_contact_success_count": 0,
+  "ik_success_count": 36,
+  "ik_success_rate": 1.0,
+  "max_achieved_lift_height_m": 0.004946805896357764,
+  "max_disturbance_drop_m": 4.069322656619079e-11,
+  "max_final_lift_height_m": 7.438614169075208e-10,
+  "max_post_disturb_hold_two_finger_contact_fraction": 0.0,
+  "max_pre_disturb_hold_two_finger_contact_fraction": 0.0,
+  "min_achieved_lift_height_m": 0.00039812909691194776,
+  "min_final_lift_height_m": 1.2537038074356133e-10,
+  "parameter_levels": {
+    "close_fraction": [
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "cube_mass_kg": [
+      0.015
+    ],
+    "cube_width_m": [
+      0.036,
+      0.042,
+      0.046
+    ],
+    "seed": [
+      0
+    ],
+    "sliding_friction": [
+      1.0,
+      2.0,
+      4.0
+    ]
+  },
+  "row_count": 36,
+  "scene": "/home/nostalgia/openarm_ws/experiments/openarm_robust_grasp/assets/cube_lift_scene.xml",
+  "stable_count": 0,
+  "stable_counts_by_close_fraction": {
+    "0.25": 0,
+    "0.5": 0,
+    "0.75": 0,
+    "1.0": 0
+  },
+  "stable_counts_by_cube_width_m": {
+    "0.036": 0,
+    "0.042": 0,
+    "0.046": 0
+  },
+  "stable_counts_by_sliding_friction": {
+    "1.0": 0,
+    "2.0": 0,
+    "4.0": 0
+  },
+  "stable_grid_fraction": 0.0,
+  "stable_rate": 0.0
+}

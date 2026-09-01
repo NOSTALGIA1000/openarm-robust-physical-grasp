@@ -1,0 +1,4 @@
+name,passed,signed_distance_m,error_m
+positive_segment_consistency,True,0.005001302224517471,1.734723475976807e-17
+geom_order_swap,True,0.005001302224517471,0.0
+set_order_invariance,True,0.005001302224517471,0.0

@@ -1,0 +1,29 @@
+<!-- Experiment-owned fixed sphere for contact-surface diagnosis.
+     Official OpenArm MJCF is included read-only from installed assets. -->
+<mujoco model="openarm contact surface sphere">
+  <visual>
+    <global offwidth="960" offheight="600"/>
+  </visual>
+
+  <option timestep="0.002" gravity="0 0 -9.81" cone="elliptic"/>
+
+  <asset>
+    <model name="cell" file="/home/nostalgia/openarm_ws/src/openarm_mujoco/v2/cell.xml"/>
+  </asset>
+
+  <worldbody>
+    <attach model="cell" prefix=""/>
+
+    <body name="surface_probe" pos="0.45 0 1.05">
+      <geom name="surface_probe_geom"
+            type="sphere"
+            size="0.021"
+            mass="0.015"
+            friction="4 2 0.1"
+            solref="0.002 1"
+            solimp="0.95 0.99 0.001"
+            contype="1"
+            conaffinity="1"/>
+    </body>
+  </worldbody>
+</mujoco>

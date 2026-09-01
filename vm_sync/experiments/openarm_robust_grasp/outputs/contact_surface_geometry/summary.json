@@ -1,0 +1,117 @@
+{
+  "csv_sha256": {
+    "instrument_controls.csv": "fb74068ff3edd0da87c58c296f1d399d84dd053b58594705d8243f14c4199d62",
+    "linkage_kinematics.csv": "e134889fbe5d998771cd9d8ec1b87a7d728d519f723e7195e17cf40c9f178e6e",
+    "shape_ladder.csv": "089019c281f8e0589662f191d36d8603fbf226e7bece5491d23d5bc2505a86f3"
+  },
+  "decision": "linkage_stroke_or_contact_configuration",
+  "instrument_gate_pass": true,
+  "linkage": {
+    "max_closing_axis_angular_drift_rad": 0.19070662235106797,
+    "max_finger_finger_contact_count": 0,
+    "max_midpoint_world_drift_m": 0.11667818999490626,
+    "max_symmetry_residual_m": 0.04376582487105043,
+    "min_signed_distance_m": -0.05828877207553513,
+    "minimum_probe_gap_m": 1.9483701283627284,
+    "pair_switch_count": 520,
+    "sampled_frames": 2020,
+    "valid_point_fraction": 0.8475247524752475,
+    "valid_point_frames": 1712
+  },
+  "protocol": "contact_surface_geometry_v1",
+  "protocol_constants": {
+    "closed_command": 0.0,
+    "command_levels": 101,
+    "open_command": 0.58905,
+    "positive_force_threshold_n": 1e-06,
+    "required_consecutive_frames": 20,
+    "shape_conditions": [
+      {
+        "condition": "sphere",
+        "dimensions_m": [
+          0.021
+        ]
+      },
+      {
+        "condition": "aligned_cuboid",
+        "dimensions_m": [
+          0.021,
+          0.01,
+          0.015
+        ]
+      },
+      {
+        "condition": "world_cube",
+        "dimensions_m": [
+          0.021,
+          0.021,
+          0.021
+        ]
+      }
+    ],
+    "steps_per_level": 20
+  },
+  "shape_conditions": [
+    {
+      "bilateral_contact_normal_diagnostic_frames": 7,
+      "condition": "sphere",
+      "dimensions_m": [
+        0.021
+      ],
+      "first_passing_command_index": null,
+      "gate_pass": false,
+      "max_inner_normal_closing_alignment": 1.0,
+      "max_inner_normal_force_n": 7184.962799939039,
+      "max_opposing_normal_dot_product": 0.9432332200691184,
+      "max_outer_normal_closing_alignment": 1.0,
+      "max_outer_normal_force_n": 6467.99803837755,
+      "min_inner_signed_gap_m": -0.01848675698661359,
+      "min_opposing_normal_dot_product": -1.0000000000000002,
+      "min_outer_signed_gap_m": -0.01850957789413029,
+      "sampled_frames": 2020,
+      "stop_reason": "full_closure_without_bilateral_gate"
+    },
+    {
+      "bilateral_contact_normal_diagnostic_frames": 712,
+      "condition": "aligned_cuboid",
+      "dimensions_m": [
+        0.021,
+        0.01,
+        0.015
+      ],
+      "first_passing_command_index": null,
+      "gate_pass": false,
+      "max_inner_normal_closing_alignment": 1.0000000000000002,
+      "max_inner_normal_force_n": 14391.162746403852,
+      "max_opposing_normal_dot_product": 0.9999999604465301,
+      "max_outer_normal_closing_alignment": 1.0,
+      "max_outer_normal_force_n": 11351.54571749501,
+      "min_inner_signed_gap_m": -0.018671868939175384,
+      "min_opposing_normal_dot_product": -1.0000000000000002,
+      "min_outer_signed_gap_m": -0.018660426443257352,
+      "sampled_frames": 2020,
+      "stop_reason": "full_closure_without_bilateral_gate"
+    },
+    {
+      "bilateral_contact_normal_diagnostic_frames": 8,
+      "condition": "world_cube",
+      "dimensions_m": [
+        0.021,
+        0.021,
+        0.021
+      ],
+      "first_passing_command_index": null,
+      "gate_pass": false,
+      "max_inner_normal_closing_alignment": 0.8467370650959588,
+      "max_inner_normal_force_n": 8439.606547678035,
+      "max_opposing_normal_dot_product": 0.9995949080832169,
+      "max_outer_normal_closing_alignment": 0.8467370650959589,
+      "max_outer_normal_force_n": 6973.458689917848,
+      "min_inner_signed_gap_m": -0.021737029501039718,
+      "min_opposing_normal_dot_product": -1.0,
+      "min_outer_signed_gap_m": -0.02131117084910214,
+      "sampled_frames": 2020,
+      "stop_reason": "full_closure_without_bilateral_gate"
+    }
+  ]
+}
