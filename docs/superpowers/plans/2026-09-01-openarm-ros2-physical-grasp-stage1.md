@@ -436,6 +436,12 @@ void MujocoGraspTelemetry::update(const mjModel *mujoco_model, mjData *mujoco_da
 }  // namespace mujoco_ros2_control
 EOF
 ```
+
+- [ ] **Step 3: Add the dependency to `package.xml`**
+
+```bash
+ssh -p 2224 nostalgia@127.0.0.1 "cd ~/ros2_ws_course_repro/ros2_ws/src/mujoco_ros2_control/mujoco_ros2_control && cp package.xml package.xml.pre_physics && sed -i 's#<depend>control_toolbox</depend>#<depend>control_toolbox</depend>\n  <depend>openarm_grasp_msgs</depend>#' package.xml && grep -n openarm_grasp_msgs package.xml"
+```
 Expected: one line containing `<depend>openarm_grasp_msgs</depend>`.
 
 - [ ] **Step 4: Add the new source and dependency to `CMakeLists.txt`**
