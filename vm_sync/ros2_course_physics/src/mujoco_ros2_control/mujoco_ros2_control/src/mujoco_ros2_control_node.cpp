@@ -22,6 +22,7 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "mujoco_ros2_control/mujoco_cameras.hpp"
+#include "mujoco_ros2_control/mujoco_grasp_telemetry.hpp"
 #include "mujoco_ros2_control/mujoco_rendering.hpp"
 #include "mujoco_ros2_control/mujoco_ros2_control.hpp"
 
@@ -80,6 +81,9 @@ int main(int argc, const char **argv)
   auto cameras = std::make_unique<mujoco_ros2_control::MujocoCameras>(node);
   cameras->init(mujoco_model);
 
+  auto telemetry = std::make_unique<mujoco_ros2_control::MujocoGraspTelemetry>(node);
+  telemetry->init(mujoco_model);
+
   // run main loop, target real-time simulation and 60 fps rendering with cameras around 6 hz
   mjtNum last_cam_update = mujoco_data->time;
   while (rclcpp::ok() && !rendering->is_close_flag_raised())
@@ -92,6 +96,7 @@ int main(int argc, const char **argv)
     while (mujoco_data->time - simstart < 1.0 / 60.0)
     {
       mujoco_control.update();
+      telemetry->update(mujoco_model, mujoco_data);
     }
     rendering->update();
 
