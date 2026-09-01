@@ -22,6 +22,7 @@
 #define MUJOCO_ROS2_CONTROL__MUJOCO_SYSTEM_HPP_
 
 #include <Eigen/Dense>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -37,6 +38,7 @@ constexpr char PARAM_KI[]{"_ki"};
 constexpr char PARAM_KD[]{"_kd"};
 constexpr char PARAM_I_MAX[]{"_i_max"};
 constexpr char PARAM_I_MIN[]{"_i_min"};
+constexpr char PARAM_MAX_EFFORT[]{"_max_effort"};
 
 class MujocoSystem : public MujocoSystemInterface
 {
@@ -75,6 +77,7 @@ public:
     bool is_velocity_control_enabled{false};
     bool is_effort_control_enabled{false};
     bool is_pid_enabled{false};
+    double pid_max_effort{std::numeric_limits<double>::max()};
     joint_limits::JointLimits joint_limits;
     bool is_mimic{false};
     int mimicked_joint_index;

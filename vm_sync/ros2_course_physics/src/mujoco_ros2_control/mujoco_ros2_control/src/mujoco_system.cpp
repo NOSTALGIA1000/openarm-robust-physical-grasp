@@ -109,8 +109,9 @@ hardware_interface::return_type MujocoSystem::write(
       if (joint_state.is_pid_enabled)
       {
         double error = joint_state.position_command - mj_data_->qpos[joint_state.mj_pos_adr];
+        double command = joint_state.position_pid.computeCommand(error, period.nanoseconds());
         mj_data_->qfrc_applied[joint_state.mj_vel_adr] =
-          joint_state.position_pid.computeCommand(error, period.nanoseconds());
+          clamp(command, -joint_state.pid_max_effort, joint_state.pid_max_effort);
       }
       else
       {
@@ -331,6 +332,19 @@ void MujocoSystem::register_joints(
     {
       last_joint_state.position_pid = get_pid_gains(joint, hardware_interface::HW_IF_POSITION);
       last_joint_state.velocity_pid = get_pid_gains(joint, hardware_interface::HW_IF_VELOCITY);
+
+      // Bound the force the PID branch may inject into MuJoCo. Without this the
+      // controller can apply arbitrarily large joint forces, which would make a
+      // "successful" grasp physically meaningless.
+      const std::string max_effort_key =
+        std::string(hardware_interface::HW_IF_POSITION) + std::string(PARAM_MAX_EFFORT);
+      if (joint.parameters.find(max_effort_key) != joint.parameters.end())
+      {
+        last_joint_state.pid_max_effort = std::stod(joint.parameters.at(max_effort_key));
+        RCLCPP_INFO_STREAM(
+          logger_, "Joint " << last_joint_state.name << " PID effort limited to "
+                            << last_joint_state.pid_max_effort << " N");
+      }
     }
   }
 }
