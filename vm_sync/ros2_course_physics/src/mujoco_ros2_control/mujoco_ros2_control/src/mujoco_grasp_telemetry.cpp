@@ -44,6 +44,13 @@ void MujocoGraspTelemetry::init(const mjModel *mujoco_model)
   }
   object_body_id_ = mujoco_model->geom_bodyid[object_geom_id_];
 
+  if (gripper_body.empty())
+  {
+    RCLCPP_ERROR(
+      node_->get_logger(), "Grasp telemetry disabled: grasp_telemetry.gripper_body is empty.");
+    return;
+  }
+
   gripper_body_id_ = mj_name2id(mujoco_model, mjOBJ_BODY, gripper_body.c_str());
   if (gripper_body_id_ < 0)
   {
