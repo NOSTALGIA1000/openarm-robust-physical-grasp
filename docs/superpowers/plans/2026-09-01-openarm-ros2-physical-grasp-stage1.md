@@ -436,7 +436,6 @@ void MujocoGraspTelemetry::update(const mjModel *mujoco_model, mjData *mujoco_da
 }  // namespace mujoco_ros2_control
 EOF
 ```
-```
 Expected: one line containing `<depend>openarm_grasp_msgs</depend>`.
 
 - [ ] **Step 4: Add the new source and dependency to `CMakeLists.txt`**
