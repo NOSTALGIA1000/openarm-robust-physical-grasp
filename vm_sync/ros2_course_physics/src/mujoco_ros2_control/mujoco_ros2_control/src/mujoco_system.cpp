@@ -115,6 +115,20 @@ hardware_interface::return_type MujocoSystem::write(
       }
       else
       {
+        // Teleporting qpos without also setting qvel leaves the link with a
+        // position that jumps but a velocity of ~0. MuJoCo's contact friction
+        // transmits tangential impulse from relative velocity, so a gripper
+        // driven this way slides along a grasped object instead of carrying
+        // it: the object is never accelerated and never lifts. Setting a
+        // velocity consistent with the commanded step makes the contact
+        // behave physically. This is still kinematic control, not actuator
+        // control (Stage 3), but it is velocity-consistent.
+        const double dt = period.seconds();
+        if (dt > 0.0)
+        {
+          mj_data_->qvel[joint_state.mj_vel_adr] =
+            (joint_state.position_command - mj_data_->qpos[joint_state.mj_pos_adr]) / dt;
+        }
         mj_data_->qpos[joint_state.mj_pos_adr] = joint_state.position_command;
       }
     }

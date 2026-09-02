@@ -285,3 +285,115 @@ genuine cube can be gripped about its centre.
   object and silently starves the picker, which then reports `planning_failure`.
   Since Stage 1 is scoped to mechanics with ground-truth targeting, the detector
   was made a non-blocking trigger; Stage 2 re-introduces perception deliberately.
+
+---
+
+# Session 3 (2026-09-03): grip proven sufficient; kinematic arm drive is the wall
+
+## 11. Missing joint velocity prevented friction transmission
+
+The plugin's non-PID position path wrote `qpos` with no corresponding `qvel`:
+
+```cpp
+mj_data_->qpos[joint_state.mj_pos_adr] = joint_state.position_command;
+```
+
+MuJoCo transmits tangential (friction) impulse from *relative velocity* at a
+contact. With the finger's position jumping but its velocity ≈ 0, the solver saw
+a static surface, so a gripped object was never dragged along — the fingers slid
+along its faces. Setting a velocity consistent with the commanded step:
+
+| | before | after |
+|---|---|---|
+| hold bilateral ratio | 0.03 | **1.00** |
+| bilateral frames in lift | 27 / 120 | **117 / 117** |
+| failure category | `contact_lost_during_lift` | `insufficient_lift` |
+
+This is speed-independent, which is why session 1's slow-lift test correctly
+refuted the "excess acceleration" explanation — the mechanism was missing
+velocity, not too much of it.
+
+## 12. The grip is demonstrably strong enough — proven in isolation
+
+An offline MuJoCo harness (seconds per run instead of minutes) removed ROS and
+MoveIt from the loop: park the object between the fingers, close under a bounded
+force, then raise the arm the way the plugin drives it.
+
+| stage | result |
+|---|---|
+| close under zero-g | **15.0 N** over 8 contacts |
+| hold under gravity, arm static | **object does not fall** |
+| raise arm kinematically | hand +7.9 mm, object **+1.2 mm** |
+
+So the grasp holds the object against gravity indefinitely when the arm is
+still, and fails only when the arm *moves*. Grip strength is not the limitation.
+
+Holding *all* arm joints (rather than only the moving one) improved carry from
+0.15 to **0.63**; writing position every physics step versus once per control
+cycle made no difference (0.63 both), ruling out sub-cycle free-fall.
+
+## 13. Contact stiffness sweep — and a real-vs-isolated divergence
+
+Offline sweep of the finger contact parameters:
+
+| config | carry ratio |
+|---|---|
+| baseline `solref 0.02` | 0.63 |
+| `solref 0.005` | 0.75 |
+| `solref 0.002` | 0.79 |
+| `solref 0.002` + friction 5.0 | 0.69 |
+| `solref 0.002` + friction 5.0 + 30 N | 0.70 |
+
+Stiffer contact helps; more friction or force does **not** — the residual slip is
+contact compliance, not a friction limit.
+
+Two cautions came out of trying to apply this:
+
+- `solref 0.002` **equals the 0.002 s integration timestep and diverges**
+  (QACC instability). A solref time constant must stay safely above the
+  timestep. That trial was discarded.
+- `solref 0.005` improved the isolated harness but **degraded** the real system
+  (bilateral confirmation was lost). The offline harness is a good instrument for
+  isolating mechanisms but does not transfer parameter choices directly.
+
+## Reproducible best-known state
+
+`position_kp 2000`, `position_max_effort 15`, `close_position 0.006`, finger
+`solref 0.02`, plus the velocity fix, on a 30 × 30 × 44 mm object:
+
+- bilateral contact **confirmed and maintained 100 %** through lift and hold
+- stable (no QACC instability)
+- reproduced across two independent runs (`grip15n`, `confirm2`)
+- **elevation still ~0** (0.2–0.5 mm against the 20 mm requirement)
+
+## Conclusion: this is the Stage 1 / Stage 3 boundary
+
+The evidence now separates two claims cleanly:
+
+1. **The grasp itself is sufficient.** It holds the object against gravity
+   statically, at 100 % bilateral contact, with ample friction margin.
+2. **The Stage 1 arm drive cannot transport it.** Position-teleported joints,
+   even made velocity-consistent, carry a gripped object only partially in the
+   isolated harness (≤0.79) and essentially not at all in the full pipeline.
+
+Meeting the 20 mm lift requirement therefore needs actuator-level arm control —
+which the design spec already defers to Stage 3. This is a structural limit of
+Stage 1's control scheme, not a tuning problem, and it should not be chased with
+further contact-parameter search.
+
+Note this supersedes, with different reasoning, the claim refuted in session 1:
+the original "unphysical acceleration" mechanism was wrong, but the conclusion
+that the limitation is structural to Stage 1's arm path is supported by
+direct measurement.
+
+## Infrastructure fixed this session
+
+- **Stale `ros2` CLI daemon** makes `ros2 control` commands fail with
+  `!rclpy.ok()` and return empty listings — indistinguishable from controllers
+  failing to load. The preflight now restarts it.
+- **`load_controller` can die outright**, leaving controllers not merely
+  inactive but *absent*; repair must load them, not just transition them.
+- **Preflight resource guard** (`/tmp/preflight.sh`): kills stale simulation
+  processes, restarts the daemon, clears leaked `fastrtps` shared memory, and
+  aborts if free RAM is below a floor. Observed reclaiming 838 MB and 35 shm
+  segments in a single run.

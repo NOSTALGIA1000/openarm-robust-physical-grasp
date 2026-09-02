@@ -339,7 +339,7 @@
       <param name="position_kd">20.0</param>
       <param name="position_i_max">5.0</param>
       <param name="position_i_min">-5.0</param>
-      <param name="position_max_effort">5.0</param>
+      <param name="position_max_effort">15.0</param>
     </joint>
 
     <!-- 右臂 -->

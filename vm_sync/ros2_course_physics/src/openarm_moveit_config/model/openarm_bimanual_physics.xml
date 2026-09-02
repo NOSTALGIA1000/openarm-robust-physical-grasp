@@ -278,7 +278,7 @@
                               diaginertia="2.3749999999999997e-06 2.3749999999999997e-06 7.5e-07" />
                             <!-- <geom name="openarm_left_right_finger_collision"
                               pos="0.0 0.05 -0.673001" quat="1.0 0.0 0.0 0.0" type="mesh"
-                              mesh="finger_collision_left" class="collision" friction="3.0 0.02 0.002" condim="4" solref="0.004 1"/>
+                              mesh="finger_collision_left" class="collision" friction="3.0 0.02 0.002" condim="4" solref="0.02 1"/>
                               摩擦力 -->
                               <!-- 碰撞箱 -->
                             <geom name="openarm_left_right_finger_collision"
@@ -313,7 +313,7 @@
                             <!-- <geom name="openarm_left_left_finger_collision"
                               pos="0.0 -0.05 -0.673001" quat="1.0 0.0 0.0 0.0" type="mesh"
                               mesh="finger_collision" class="collision" 
-                              friction="3.0 0.02 0.002" condim="4" solref="0.004 1"/>
+                              friction="3.0 0.02 0.002" condim="4" solref="0.02 1"/>
                               摩擦力 -->
                                <!-- 碰撞箱 -->
                             <geom name="openarm_left_left_finger_collision"
@@ -494,7 +494,7 @@
                               diaginertia="2.3749999999999997e-06 2.3749999999999997e-06 7.5e-07" />
                             <!-- <geom name="openarm_right_right_finger_collision"
                               pos="0.0 0.05 -0.673001" quat="1.0 0.0 0.0 0.0" type="mesh"
-                              mesh="finger_collision_left" class="collision" friction="3.0 0.02 0.002" condim="4" solref="0.004 1"/>
+                              mesh="finger_collision_left" class="collision" friction="3.0 0.02 0.002" condim="4" solref="0.02 1"/>
                               摩擦力 -->
                               <!-- 碰撞箱 -->
                             <geom name="openarm_right_right_finger_collision"
