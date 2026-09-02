@@ -29,17 +29,17 @@
          Geometry, mass, friction and solver parameters are the untuned values
          carried over from the demo object so the first failure stays
          interpretable. -->
-    <body name="physics_object" pos="0.3 0 0.45">
+    <body name="physics_object" pos="0.3 0 0.447">
       <freejoint name="physics_object_free"/>
       <geom name="physics_object_geom"
             type="box"
-            size="0.02 0.02 0.02"
+            size="0.015 0.015 0.022"
             rgba="1 0 0 1"
             mass="0.1"
             condim="4"
             solref="0.005 1"
             solimp="0.95 0.99 0.001"
-            margin="0.005"/>
+            margin="0.0"/>
     </body>
 
     <body name="debug_marker" pos="0 0 0">

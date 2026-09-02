@@ -334,7 +334,7 @@
       <command_interface name="position_pid"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
-      <param name="position_kp">300.0</param>
+      <param name="position_kp">2000.0</param>
       <param name="position_ki">0.0</param>
       <param name="position_kd">20.0</param>
       <param name="position_i_max">5.0</param>

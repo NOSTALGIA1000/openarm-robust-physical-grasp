@@ -317,13 +317,15 @@ class PhysicsPicker(Node):
             self._baseline_z = self._latest.object_pose.position.z
         self.get_logger().info("settled baseline z = {:.4f}".format(self._baseline_z))
 
-        deadline = time.time() + 60.0
+        deadline = time.time() + self.config.detector_wait_s
         while self._target is None and time.time() < deadline:
             time.sleep(0.1)
-        if self._target is None:
-            self.get_logger().error("no target observation on /apple_location")
-            return self._finish(False, gripper_ok, True)
-        x, y, z_surface = self._target
+        detector_seen = self._target is not None
+        if not detector_seen:
+            self.get_logger().warning(
+                "no observation on /apple_location within {:.0f}s; proceeding on "
+                "simulator ground truth (Stage 1 tests mechanics, not perception)"
+                .format(self.config.detector_wait_s))
 
         # Stage 1 isolates grasp mechanics from perception. The detector's
         # observation is still required as a task trigger above, but the grasp
@@ -341,13 +343,17 @@ class PhysicsPicker(Node):
         # is shifted by the negative of that.
         x = x - self.config.jaw_offset_x
         y = y - self.config.jaw_offset_y
-        self.get_logger().info(
-            "ground-truth grasp target: x={:.4f} y={:.4f} (detector gave "
-            "x={:.4f} y={:.4f})".format(x, y, self._target[0], self._target[1])
-        )
+        if detector_seen:
+            self.get_logger().info(
+                "ground-truth grasp target: x={:.4f} y={:.4f} (detector gave "
+                "x={:.4f} y={:.4f})".format(x, y, self._target[0], self._target[1]))
+        else:
+            self.get_logger().info(
+                "ground-truth grasp target: x={:.4f} y={:.4f} (no detector fix)"
+                .format(x, y))
 
         quat = (0.0, 1.0, 0.0, 0.0)  # tool z pointing down
-        hover_z = z_surface + self.config.hover_offset_m
+        hover_z = obj_z + self.config.hover_offset_m
         grasp_z = obj_z + self.config.jaw_offset_z
 
         self.set_stage("hover")

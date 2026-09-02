@@ -165,3 +165,123 @@ simulation.
 - **`friction` in MuJoCo combines element-wise `max`.** The table's μ=0.05 never
   applied because the object's μ=1.0 governed — worth checking before "fixing"
   a surface property.
+
+---
+
+# Session 2 (2026-09-03): model agreement achieved, grip forms, extrusion remains
+
+## 7. The 25 mm model contradiction — resolved
+
+The forward-kinematics comparison called for at the end of session 1 was run:
+identical joint vectors fed to both models, comparing the resulting
+`openarm_left_hand` world pose.
+
+Links 0–7 matched to **machine precision**. The discrepancy appeared only at the
+hand, and was **4.5 mm, not 25 mm** — and it *varied with pose*, which is what
+made run-to-run alignment inconsistent.
+
+Cause: the MJCF has an intermediate body the URDF does not.
+
+```
+openarm_left_link8   pos="1e-06 0.0205 0.0"      <- absent from the URDF
+  openarm_left_hand  pos="0 -0.025  0.1001"
+```
+
+Net MJCF offset = `0.0205 − 0.025` = **−0.0045 m**, exactly the measured delta.
+The URDF's is 0. This also explains why session 1's attempted fix (setting the
+hand to y=0) made things *worse*: it produced a net `+0.0205`, matching the
+−22.2 mm that was observed. The wrong term was being corrected.
+
+**Fix:** hand y `−0.025 → −0.0205` on both arms, making the net exactly zero.
+Verified: FK delta is now `[0, 0, 0]` at every test pose, and measured descend
+misalignment fell to **0.07–0.5 mm**, repeatably.
+
+## 8. Contact margin — the dominant physics defect
+
+The object geom carried `margin="0.005"` — a 5 mm contact margin, inherited from
+the sphere and never revisited. Contacts activated 5 mm before surfaces met, so
+the object floated in a force cushion.
+
+| | margin 0.005 | margin 0 |
+|---|---|---|
+| `table_top` max force | 22.27 N | **0.64 N** |
+| settled height | 0.4450 (floating) | **0.4400** (on the table) |
+| slide during close | +43 to +50 mm | **+12.6 mm** |
+| yaw change | −16° | **−0.15°** |
+
+0.64 N across 4–5 corner contacts is correct for a 0.98 N object. Rotation and
+cam-out were essentially eliminated by this one change.
+
+## 9. Object must be smaller than the finger pad
+
+The pads are 40 × 4 × 40 mm. With a 40 mm cube the two are the same size, so a
+~2 mm lateral offset puts a cube corner exactly at the pad edge, producing an
+oblique contact normal with an x-component. Measured: at first contact the cube
+received a +2 mm x-impulse and then coasted 44 mm away while the arm was
+provably stationary (`grip_x` constant to 0.4 mm).
+
+Shrinking the object to 30 mm so it sits wholly inside the pad face:
+
+| | 40 mm cube | 30 mm cube |
+|---|---|---|
+| net x-slide during close | +44 mm | **+0.4 mm** |
+| yaw change | 11.4° | **−0.21°** |
+
+## 10. Grip force is set by position error, not by the clamp
+
+With `position_kp` lowered to 300 during ejection debugging, commanding 3 mm of
+overshoot yields only `300 × 0.003` = **0.9 N** — barely above the 0.5 N contact
+threshold, so contact flickered and never confirmed. The low gain had been
+introduced to fight an ejection that geometry and margin fixes had since removed.
+
+Restoring `position_kp = 2000` (clamp still bounded at 5 N):
+
+| | kp 300 | kp 2000 |
+|---|---|---|
+| bilateral frames | 8 / 287 | **136 / 268** |
+| longest bilateral run | 0.02 s | **0.159 s** (need 0.30) |
+| contact force | 1.3 N | **3–9 N both fingers** |
+| object lift during close | — | **+5.7 mm** |
+
+A genuine two-finger grip now forms and lifts the object.
+
+## Remaining failure: extrusion from the jaw
+
+The grip forms but the object squeezes forward-and-up out of the jaw
+(+37.9 mm x, rising z) and is released. Cause is vertical: the 40 mm-tall pad
+cannot centre on a 30 mm object resting on a table without its lower edge
+penetrating the table, so the pressure centre sits ~6 mm above the object's
+centre and squeezing produces an upward-forward moment.
+
+Attempted remedy — a taller 30 × 30 × 50 mm object so the centres coincide —
+**failed**: it is top-heavy on a 30 mm base and tips (bilateral fell back to
+0.040 s). A 30 × 30 × 44 mm compromise was prepared but not yet measured; the VM
+degraded before it ran.
+
+**Next step:** measure the 30 × 30 × 44 mm object (centre 0.442, pad spans
+0.422–0.462, clears the table by 2 mm, squat enough not to tip). If extrusion
+persists, the honest conclusion is that this pad/object/table geometry cannot
+produce a centred grasp, and the object should be raised on a pedestal so a
+genuine cube can be gripped about its centre.
+
+## Infrastructure defects found (would have corrupted an acceptance run)
+
+- **Controllers silently fail to activate.** The launch's `load_controller`
+  chain races under load and leaves `left_arm_controller` / `left_hand_controller`
+  **unconfigured** while still advertising their action servers, so the picker
+  blocks forever in `wait_for_server`. A trial runner must verify actual
+  controller state and repair it, not grep a log line — the "Successfully loaded"
+  line appears even on a failed retry.
+- **`grep "active"` matches `inactive`.** Cost one wasted trial; compare the
+  state field exactly.
+- **Stale DDS shared memory** accumulates across killed runs (279 segments
+  observed) and corrupts `ros2 control list_controllers` output. Clear
+  `/dev/shm/fastrtps*` between batches.
+- **VM resource exhaustion is the top confound.** Load average reached 121 and
+  later 45 with 141 MB free; launches stretched 60 s → 360 s and MoveIt returned
+  spurious planning failures. Always check `uptime` and `free` before trusting a
+  timing-sensitive result.
+- **The detector is not a reliable Stage 1 trigger.** It cannot see a 30 mm
+  object and silently starves the picker, which then reports `planning_failure`.
+  Since Stage 1 is scoped to mechanics with ground-truth targeting, the detector
+  was made a non-blocking trigger; Stage 2 re-introduces perception deliberately.

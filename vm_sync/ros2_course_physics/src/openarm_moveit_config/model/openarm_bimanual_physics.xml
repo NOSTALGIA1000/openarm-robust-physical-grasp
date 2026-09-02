@@ -254,7 +254,7 @@
                         quat="1.0 0.0 0.0 0.0" material="matte_black" type="mesh"
                         mesh="link7_1_left.obj" class="visual" />
                       <body name="openarm_left_link8" pos="1e-06 0.0205 0.0" quat="1.0 0.0 0.0 0.0">
-                        <body name="openarm_left_hand" pos="0 -0.025 0.1001" quat="1.0 0.0 0.0 0.0">
+                        <body name="openarm_left_hand" pos="0 -0.0205 0.1001" quat="1.0 0.0 0.0 0.0">
                           <inertial pos="0.0 0.002 0.01" quat="1.0 0.0 0.0 0.0" mass="0.15"
                             diaginertia="0.0001 0.00025 0.00017" />
                           <geom name="openarm_left_hand_collision" pos="0.0 0.005 -0.6585"
@@ -470,7 +470,7 @@
                         quat="1.0 0.0 0.0 0.0" material="matte_black" type="mesh" mesh="link7_1.obj"
                         class="visual" />
                       <body name="openarm_right_link8" pos="1e-06 0.0205 0.0" quat="1.0 0.0 0.0 0.0">
-                        <body name="openarm_right_hand" pos="0 -0.025 0.1001" quat="1.0 0.0 0.0 0.0">
+                        <body name="openarm_right_hand" pos="0 -0.0205 0.1001" quat="1.0 0.0 0.0 0.0">
                           <inertial pos="0.0 0.002 0.01" quat="1.0 0.0 0.0 0.0" mass="0.15"
                             diaginertia="0.0001 0.00025 0.00017" />
                           <geom name="openarm_right_hand_collision" pos="0.0 0.005 -0.6585"
@@ -569,9 +569,9 @@
   </worldbody>
   <equality>
     <joint joint1="openarm_right_finger_joint1" joint2="openarm_right_finger_joint2"
-      polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.02 1" />
+      polycoef="0 1 0 0 0" solimp="0.99 0.999 0.001" solref="0.002 1" />
     <joint joint1="openarm_left_finger_joint1" joint2="openarm_left_finger_joint2"
-      polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.02 1" />
+      polycoef="0 1 0 0 0" solimp="0.99 0.999 0.001" solref="0.002 1" />
   </equality>
 
 

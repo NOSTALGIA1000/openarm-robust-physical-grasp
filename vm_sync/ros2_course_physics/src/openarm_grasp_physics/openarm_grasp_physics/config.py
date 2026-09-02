@@ -27,7 +27,7 @@ class GraspConfig:
 
     # Finger joint travel in metres. 0.0 is closed, 0.06 is fully open.
     open_position: float = 0.030
-    close_position: float = 0.013
+    close_position: float = 0.006
     open_tolerance: float = 0.005
 
     # Motion offsets in metres relative to the observed object surface.
@@ -42,7 +42,7 @@ class GraspConfig:
     # closes.
     jaw_offset_x: float = 0.0
     jaw_offset_y: float = 0.0
-    jaw_offset_z: float = 0.013
+    jaw_offset_z: float = 0.005
 
     # MoveIt plans in joint space, so one long descend lets the TCP bow away
     # from vertical and the fingers sweep laterally through the object. That
@@ -50,6 +50,13 @@ class GraspConfig:
     # after which closing strikes its corners and cams it out. Descending in
     # short increments keeps the path near-vertical.
     descend_steps: int = 1
+
+    # Stage 1 isolates grasp mechanics from perception, so a detector
+    # observation is a nice-to-have trigger, not a precondition. The course
+    # detector is tuned for the original object and does not always see a
+    # smaller one; blocking on it would inject a perception limitation into a
+    # mechanics experiment. Stage 2 re-introduces perception deliberately.
+    detector_wait_s: float = 20.0
 
     # Timeouts, all in simulation seconds.
     settle_duration_s: float = 1.0
