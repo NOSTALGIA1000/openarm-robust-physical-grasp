@@ -198,7 +198,8 @@ class PhysicsPicker(Node):
             self._stage = stage
         now = self.sim_time()
         if now is not None:
-            self.recorder.mark_stage(stage, now)
+            with self._lock:
+                self.recorder.mark_stage(stage, now)
         self.get_logger().info("stage -> {}".format(stage))
 
     # ---------------- motion primitives ----------------
@@ -376,7 +377,12 @@ class PhysicsPicker(Node):
         """Accept only bilateral contact sustained for the confirmation window."""
         start = self.sim_time()
         window_start = None
+        # Wall-clock safety bound: if the simulator hangs or dies, sim_time()
+        # freezes and the sim-time checks below never fire on their own.
+        wall_deadline = time.time() + self.config.gripper_action_timeout_s * 20
         while True:
+            if time.time() > wall_deadline:
+                return False
             now = self.sim_time()
             if now is None:
                 return False
@@ -412,7 +418,8 @@ class PhysicsPicker(Node):
             )
 
         category = classify_trial(observations, self.config)
-        summary = self.recorder.finish(observations, category)
+        with self._lock:
+            summary = self.recorder.finish(observations, category)
         self.get_logger().info(
             "trial {} -> {} (elevation {:.4f} m, drift {:.4f} m, hold ratio {:.2f})".format(
                 self.trial_id,
