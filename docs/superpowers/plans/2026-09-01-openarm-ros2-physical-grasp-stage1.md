@@ -1707,18 +1707,28 @@ IDENTITY = (1.0, 0.0, 0.0, 0.0)
 YAW_90 = (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5))
 
 
+def assert_vec_close(actual, expected, abs_tol=1e-9):
+    for a, e in zip(actual, expected):
+        assert math.isclose(a, e, abs_tol=abs_tol), f"{actual} != {expected}"
+
+
 def test_identity_rotation_is_a_plain_offset():
     result = relative_position((0.3, 0.0, 0.5), (0.3, 0.0, 0.6), IDENTITY)
 
-    assert result == (0.0, 0.0, -0.1)
+    # 0.5 - 0.6 is not exactly representable in binary64 (it lands near
+    # -0.09999999999999998, not the literal -0.1), so this compares with a
+    # tolerance rather than "==" — the geometry, not raw bit patterns, is
+    # what this test locks in.
+    assert_vec_close(result, (0.0, 0.0, -0.1))
 
 
 def test_gripper_rotation_is_applied():
     result = relative_position((1.0, 0.0, 0.0), (0.0, 0.0, 0.0), YAW_90)
 
-    assert result[0] == 0.0
-    assert result[1] == -1.0
-    assert result[2] == 0.0
+    # sqrt(0.5) is irrational; its rotation-matrix terms carry a residual on
+    # the order of 1e-16 even for the "should be exactly zero" components, so
+    # this compares with a tolerance rather than "==".
+    assert_vec_close(result, (0.0, -1.0, 0.0))
 
 
 def test_distance_is_euclidean():
@@ -1729,7 +1739,7 @@ def test_zero_drift_when_relative_pose_is_unchanged():
     grasp = relative_position((0.3, 0.0, 0.5), (0.3, 0.0, 0.6), IDENTITY)
     lifted = relative_position((0.3, 0.0, 0.55), (0.3, 0.0, 0.65), IDENTITY)
 
-    assert distance(grasp, lifted) == 0.0
+    assert math.isclose(distance(grasp, lifted), 0.0, abs_tol=1e-9)
 
 
 def test_slip_shows_up_as_relative_drift():
@@ -1807,7 +1817,7 @@ Run:
 ```bash
 ssh -p 2224 nostalgia@127.0.0.1 "cd ~/ros2_ws_course_repro/ros2_ws/src/openarm_grasp_physics && python3 -m pytest test/test_geometry.py -q"
 ```
-Expected: `6 passed`. If `test_identity_rotation_is_a_plain_offset` fails on floating-point representation, the implementation is still correct only if the values match exactly; do not loosen the test without recording why.
+Expected: `6 passed`.
 
 - [ ] **Step 5: Mirror and commit**
 
