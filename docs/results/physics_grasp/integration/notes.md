@@ -1,5 +1,17 @@
 # Task 13 — Physics-mode integration validation notes
 
+> **Correction notice (2026-09-02, post-review):** the original aligned-trial
+> writeup below stated the object "never left the table" and that its
+> position was "static ... while `any_contact` is `false`". Both statements
+> are false — the object is ejected off the table at t~=324.48 s and lands
+> on the floor 4.2 m away. See the struck-through/annotated passages in
+> Step 6 and Step 7 below, and the new **"Corrected aligned-trial finding"**
+> section at the end of this file for the full, corrected account. The
+> misaligned-trial findings and the Step-7 contact statistics (50/26/1
+> breakdown, 0.16 s longest bilateral run, 8-17 N forces) were verified
+> independently and are unaffected — only the aligned-trial conclusion
+> changes.
+
 Date: 2026-09-02
 Launch log: `/tmp/physics_launch.log` (also mirrored to
 `docs/results/physics_grasp/integration/` on the Windows side is not done —
@@ -138,18 +150,40 @@ Trial `aligned_check` result (`trial.json` / `report.md`):
 - `any_contact: true`, and grep of `samples.csv` shows genuine finger-geom
   contact was recorded (this is not the `no_contact`-with-finger-geoms
   classification bug — the category is not even `no_contact`).
-- `max_elevation_m: 4.3e-5 m` — the object never left the table, and this
-  displacement is fully explained by momentary finger squeeze during
-  `close`, not a lift; there is no "object motion with no contact" in the
-  samples (object position is static to within numerical noise while
-  `any_contact` is `false`).
-- None of the four listed defect categories apply. This is the legitimate
-  research finding the brief anticipated.
+- **CORRECTION (post-review, see bottom of file): the statement that
+  originally appeared here — "the object never left the table" / "object
+  position is static ... while `any_contact` is `false`" — is FALSE and is
+  struck out below.** `max_elevation_m: 4.3e-5 m` only reflects the
+  *initial* momentary finger squeeze during `close`; it does **not** mean
+  the object stayed near the table. See "Corrected aligned-trial finding"
+  below for what actually happens: the object is ejected laterally at
+  `t~=324.48 s`, still inside `close`, and lands on the floor. The `report.md`
+  numbers (`max_elevation_m`, `max_drift_m` both reading effectively 0) are
+  real values of narrowly-defined metrics, not evidence the object stayed
+  put — see the "Metric limitations" note below.
+- Re-checked against the four listed defect categories with the corrected
+  trajectory in hand: this is **still not** the "object motion with no
+  contact" (attachment-leak) defect, because the object's motion during the
+  `False/False` samples is the *ballistic/sliding continuation of velocity
+  imparted during a real, recorded bilateral-contact event* (momentum
+  carried forward, not a commanded or uncaused motion) — see below. It is,
+  however, a different and more informative physical finding than the
+  `unilateral_contact` label suggests on its own.
 
 ## Step 7: diagnosis (evidence gathered before any parameter change)
 
-Per the brief's required order, `samples.csv` for the `close` stage
-(sim time 322.90 s - 324.48 s, ~1.56 s) was inspected in full:
+**CORRECTION (post-review): the window cited below as "the close stage"
+(322.90 s - 324.48 s, ~1.56 s) is wrong. `trial.json`'s own `stage_times`
+puts the full `close` stage at 322.90 s -> 329.56 s (6.66 s). The analysis
+below only covers the first ~1.58 s of that window and stops at exactly the
+moment the object is ejected (t=324.48 s) — the diagnosis below is
+therefore incomplete on its own; read it together with "Corrected
+aligned-trial finding" at the end of this file, which covers the full
+window and supersedes the "closest to case 2" conclusion.**
+
+Per the brief's required order, `samples.csv` for the first part of the
+`close` stage (sim time 322.90 s - 324.48 s, ~1.56 s of the stage's full
+6.66 s) was inspected in full:
 
 1. **Not "no finger contact at all"** — ruled out. 77 of 333 close-stage
    samples show contact on at least one finger (the remaining 256 are
@@ -177,19 +211,27 @@ Per the brief's required order, `samples.csv` for the `close` stage
    "bilateral contact with high force but object escapes on lift" /
    friction case does not apply either.
 
-**Conclusion**: this result does not fit cleanly into the brief's case 3
-("bilateral contact with small normal forces" — forces were ample, not
-small) or case 4 ("escapes on lift" — lift was never reached). It is
-closest to case 2, "contact on one finger only -> coupling or
-approach-angle problem, not force": contact was intermittently unilateral
-and, even when bilateral, was not sustained/symmetric long enough to pass
-the confirmation window, despite forces being well above threshold. The
-brief's own guidance for case 2 is explicit that this is **not** a force
-problem, and it gives no force-related parameter to raise for it (unlike
-cases 3 and 4). Raising `position_kp`/`position_max_effort` (case 3's
-remedy) would not address a timing/geometry chattering issue and risks
-masking it; the friction pair (case 4's remedy) is moot because lift was
-never attempted.
+**Conclusion (superseded — see "Corrected aligned-trial finding" below):**
+this result does not fit cleanly into the brief's case 3 ("bilateral
+contact with small normal forces" — forces were ample, not small) or case 4
+("escapes on lift" — lift was never reached). It is closest to case 2,
+"contact on one finger only -> coupling or approach-angle problem, not
+force": contact was intermittently unilateral and, even when bilateral, was
+not sustained/symmetric long enough to pass the confirmation window,
+despite forces being well above threshold. The brief's own guidance for
+case 2 is explicit that this is **not** a force problem, and it gives no
+force-related parameter to raise for it (unlike cases 3 and 4). Raising
+`position_kp`/`position_max_effort` (case 3's remedy) would not address a
+timing/geometry chattering issue and risks masking it; the friction pair
+(case 4's remedy) is moot because lift was never attempted.
+
+**All of the above (the contact statistics, the 0.16 s longest-bilateral-run
+figure, and the 8-17 N force range) is correct and independently
+reproduces exactly against `samples.csv`.** What is wrong is treating
+"never reached lift" as the end of the story: the chattering contact does
+not fizzle out harmlessly, it ends in an ejection event at t=324.48 s that
+throws the object off the table. See below for the corrected, more
+informative physical finding.
 
 **No parameter was changed as a result of Step 7.** Per the brief's
 instruction to diagnose before tuning, and because the diagnostic evidence
@@ -231,9 +273,132 @@ No other parameter was changed. Physics timestep remained `0.002` throughout
 - Zero `cube_x`/`cube_y`/`cube_z` errors in the launch log.
 - Misaligned trial: `no_contact`, elevation `0.0 m` — nothing moves the
   object except contact.
-- Aligned trial: `unilateral_contact` — a legitimate physics finding, not
-  a defect under the brief's four defect categories. Root cause per Step 7
-  evidence: bilateral contact occurs with ample force but chatters and
-  never sustains the 0.30 s confirmation window; the trial never reaches
-  `lift`. No parameter changed; flagged for follow-up investigation of
-  finger coupling / approach-angle / contact stability during `close`.
+- Aligned trial: `unilateral_contact` (the state-machine's recorded label)
+  — a legitimate physics finding, not a defect under the brief's four
+  defect categories. **CORRECTED per post-review analysis below: the
+  underlying mechanism is squeeze-ejection** — bilateral contact forms
+  with ample force (8-17 N) but is geometrically unstable, chatters, and
+  at t=324.48 s ejects the object laterally off the table entirely (it
+  lands on the floor ~4.2 m away, with no measurable deceleration
+  afterward — a low-friction observation). The trial never reaches `lift`,
+  but that is no longer the main story; see "Corrected aligned-trial
+  finding" below. No parameter changed; flagged for a separate follow-up
+  task to investigate the ejection mechanism (finger/object contact
+  geometry, damping) and the apparent near-zero friction.
+
+## Corrected aligned-trial finding (post-review, 2026-09-02)
+
+The Step 6/7 writeup above stopped its inspection of `samples.csv` at
+t=324.48 s, describing that as the end of the `close` stage. It is not —
+`trial.json`'s `stage_times` puts `close` at 322.90 s -> 329.56 s (6.66 s
+total). Re-inspecting the full window changes the finding.
+
+### What actually happens (verified directly against `aligned_check/samples.csv`)
+
+- t=322.90-324.46 s: contact chatters as already described (bilateral
+  `True/True` interleaved with unilateral `True/False`, longest sustained
+  bilateral run 0.16 s, forces 8-17 N per finger).
+- **t=324.14-324.46 s (17 samples, still bilateral/near-bilateral contact):
+  the object accelerates laterally while gripped.** `object_x` progresses
+  0.3238 -> 0.3241 -> 0.3244 -> 0.3248 -> 0.3252 -> 0.3256 -> 0.3261 ->
+  0.3267 -> 0.3274 -> 0.3282 -> 0.3290 -> 0.3301 -> 0.3316 -> 0.3335 ->
+  0.3361 -> 0.3395 -> 0.3441, with the per-sample increment growing every
+  step (from ~0.0003 m/sample up to ~0.0046 m/sample) — a monotonically
+  accelerating lateral launch, not noise.
+- **t=324.48 s: contact drops to `False/False`** and the object continues
+  in free flight/slide at an effectively **constant velocity of
+  ~0.456-0.462 m/s** (measured from consecutive `object_x` deltas both
+  right after ejection and ~2.7 s later, e.g. 327.14->327.16 s) — i.e. no
+  measurable deceleration.
+- **The object falls off the table**: `object_z` drops from 0.4499 m to
+  0.029916538717898292 m (the floor) by roughly t=325.6-325.9 s, and stays
+  pinned at that floor height for the rest of the trial.
+- By the last recorded sample (t=333.64 s, well into `retreat`),
+  `object_x` has reached ~4.58 (from a start of 0.30) — about **4.2-4.3 m
+  of travel**, entirely unpowered by any controller.
+- The trial's own `elevation` column reads a constant `-0.42` once the
+  object is on the floor (i.e. 0.42 m *below* its resting height), which
+  is consistent with `object_z` (0.4499 -> 0.0299 = -0.42 m). This
+  contradicts `trial.json`'s `max_elevation_m: 4.322870694939418e-05`,
+  which is not wrong as a number — it is just not the number this finding
+  needs (see "Metric limitations" below).
+
+### Corrected physical finding
+
+The gripper does **not** fail to make contact with the object. It makes
+strong, genuine bilateral contact (8-17 N per finger, far above the 0.5 N
+threshold) and then **ejects** it: two rigid parallel fingers pinching a
+smooth ~25 mm sphere convert closing force into lateral launch velocity
+rather than a stable grip, once the contact geometry becomes even slightly
+asymmetric (as the chattering `True/False` samples show it does). The
+`unilateral_contact` label the state machine recorded is technically what
+the confirmation logic observed (bilateral contact never sustained the
+required window), but it understates the mechanism: this is a
+**squeeze-ejection** event, not a near-miss that simply didn't hold long
+enough.
+
+**Low-friction observation**: once ejected, the object shows no measurable
+deceleration over its ~9 s of travel (on the table briefly, then across
+the floor), which points to near-zero effective friction between the
+object and both the table/floor and possibly the object's own geom
+defaults. This is recorded as an observation relevant to any future
+friction tuning (per the brief's own note that the object geom "inherits
+defaults" while `table_top` uses `friction="0.05 0.01 0.01"`), not acted on
+in this task.
+
+### Why this is still not the "object motion with no contact" (attachment-leak) defect
+
+The brief's fourth defect category is object motion **with no contact
+recorded** — i.e., motion with no physical cause, which would indicate a
+software attachment. That is not what happens here: the object's velocity
+is imparted during real, recorded bilateral contact (t=324.14-324.46 s,
+`any_contact: true`), and its subsequent free flight and floor-slide after
+t=324.48 s (`any_contact: false`) is exactly the physically-expected
+continuation of that momentum under gravity and (near-zero) friction —
+no controller, joint, or software attachment is commanding the object's
+pose at any point. This is real MuJoCo contact dynamics doing exactly what
+contact dynamics should do; it rules out an attachment leak rather than
+demonstrating one.
+
+### Metric limitations (add as explicit caveats for future tasks)
+
+Two `trial.json` fields cannot be trusted to rule out an object escaping
+mid-trial, and a later task should not treat them as sufficient evidence
+that "the object stayed near the gripper/table":
+
+- **`max_drift_m` stays `0.0`** because drift is only computed relative to
+  `self._grasp_relative`, which is only set once
+  `_confirm_bilateral_contact()` returns `True` (see `physics_picker.py`).
+  Since bilateral contact was never confirmed in this trial, drift
+  tracking never started, even though the object moved ~4.2 m.
+- **`max_elevation_m` only tracks upward peaks** (it reads
+  `4.322870694939418e-05`, essentially the height of the momentary
+  finger-squeeze bump, not the object's true final displacement). A 0.42 m
+  *fall* off the table is invisible to this field; only the raw
+  `object_z`/`object_x` columns in `samples.csv` (or a min-elevation /
+  net-displacement metric, which does not currently exist) reveal it.
+
+**Net effect**: `report.md`'s summary line "Max elevation: 0.0000 m
+(threshold 0.020 m)" is an accurate value of a narrowly-scoped metric, but
+reading it alone (without checking `samples.csv`) would incorrectly imply
+the object was undisturbed. Future tasks relying on these two fields to
+screen for "object escaped" should instead check `samples.csv` directly
+(final `object_x`/`object_y`/`object_z` vs. initial, and whether contact
+ever returns to `False/False` with nonzero velocity) until a
+proper displacement/escape metric is added to the trial recorder.
+
+### Revised Step 7 conclusion
+
+The original "closest to case 2 (coupling/approach-angle, not force)"
+conclusion is superseded. The mechanism is squeeze-ejection: bilateral
+contact forms with ample force, is geometrically unstable against a smooth
+sphere between rigid parallel fingers, and converts closing force into
+lateral ejection before the confirmation window can complete. As before,
+**no parameter was changed** — none of the brief's four diagnostic remedies
+(cases 1-4) is a good fit for a squeeze-ejection mechanism, and this task's
+scope explicitly excludes tuning based on an open-ended finding. This is
+flagged for the separate follow-up task the coordinator has already
+identified to investigate the ejection mechanism itself (finger/object
+contact geometry, damping, or a compliant/non-rigid contact model), and the
+near-zero-friction observation is flagged for that same follow-up's
+attention when it looks at grip retention.
