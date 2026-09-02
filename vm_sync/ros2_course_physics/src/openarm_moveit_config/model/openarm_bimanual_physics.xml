@@ -289,9 +289,9 @@
                               class="collision" 
                               group="3"    
                               solimp="0.95 0.99 0.001"           
-                              rgba="1 0 0 1"          
-                              friction="1.0 1.0 1.0" 
-                              condim="4" 
+                              rgba="1 0 0 1"
+                              friction="2.0 1.0 0.01"
+                              condim="6"
                               solref="0.02 1"
                               margin="0.001"/>
                               <!-- 碰撞箱 -->
@@ -324,9 +324,9 @@
                               class="collision" 
                               group="3"            
                               solimp="0.95 0.99 0.001"   
-                              rgba="1 0 0 1"          
-                              friction="1.0 1.0 1.0" 
-                              condim="4" 
+                              rgba="1 0 0 1"
+                              friction="2.0 1.0 0.01"
+                              condim="6"
                               solref="0.02 1"
                               margin="0.001"/>
                               <!-- 把这个碰撞方块（box）调到手指尖 -->
