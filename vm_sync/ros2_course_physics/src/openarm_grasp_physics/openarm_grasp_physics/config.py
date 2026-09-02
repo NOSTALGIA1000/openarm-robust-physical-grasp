@@ -26,13 +26,30 @@ class GraspConfig:
     max_drift_m: float = 0.010
 
     # Finger joint travel in metres. 0.0 is closed, 0.06 is fully open.
-    open_position: float = 0.055
-    close_position: float = 0.0
+    open_position: float = 0.030
+    close_position: float = 0.013
     open_tolerance: float = 0.005
 
     # Motion offsets in metres relative to the observed object surface.
     hover_offset_m: float = 0.08
-    grasp_z_offset_m: float = 0.0
+    grasp_z_offset_m: float = -0.02
+
+    # The gripper's jaw centre is not coincident with the commanded TCP frame.
+    # Measured from the model (constant across finger opening): the jaw centre
+    # sits at (0, +0.006, +0.005) m in TCP local coordinates. Without this
+    # compensation the object ends up ~6 mm toward one finger, so that finger
+    # always contacts first and knocks it out of the jaw before the other
+    # closes.
+    jaw_offset_x: float = 0.0
+    jaw_offset_y: float = 0.0
+    jaw_offset_z: float = 0.013
+
+    # MoveIt plans in joint space, so one long descend lets the TCP bow away
+    # from vertical and the fingers sweep laterally through the object. That
+    # was measured to spin the cube ~12 deg about z before the gripper closed,
+    # after which closing strikes its corners and cams it out. Descending in
+    # short increments keeps the path near-vertical.
+    descend_steps: int = 1
 
     # Timeouts, all in simulation seconds.
     settle_duration_s: float = 1.0

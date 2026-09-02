@@ -159,6 +159,10 @@ class PhysicsPicker(Node):
                     object_x=object_xyz[0],
                     object_y=object_xyz[1],
                     object_z=object_xyz[2],
+                    object_qw=msg.object_pose.orientation.w,
+                    object_qx=msg.object_pose.orientation.x,
+                    object_qy=msg.object_pose.orientation.y,
+                    object_qz=msg.object_pose.orientation.z,
                     gripper_x=gripper_xyz[0],
                     gripper_y=gripper_xyz[1],
                     gripper_z=gripper_xyz[2],
@@ -204,13 +208,13 @@ class PhysicsPicker(Node):
 
     # ---------------- motion primitives ----------------
 
-    def move_to(self, x, y, z, quat, tolerance=0.01):
+    def move_to(self, x, y, z, quat, tolerance=0.01, velocity_scale=0.05, acceleration_scale=0.05):
         goal = MoveGroup.Goal()
         goal.request.group_name = GROUP
         goal.request.num_planning_attempts = 10
         goal.request.allowed_planning_time = 5.0
-        goal.request.max_velocity_scaling_factor = 0.05
-        goal.request.max_acceleration_scaling_factor = 0.05
+        goal.request.max_velocity_scaling_factor = velocity_scale
+        goal.request.max_acceleration_scaling_factor = acceleration_scale
 
         constraints = Constraints()
         constraints.name = "physics_pose_goal"
@@ -238,9 +242,9 @@ class PhysicsPicker(Node):
             orientation.orientation.z,
             orientation.orientation.w,
         ) = quat
-        orientation.absolute_x_axis_tolerance = 0.05
-        orientation.absolute_y_axis_tolerance = 0.05
-        orientation.absolute_z_axis_tolerance = 0.05
+        orientation.absolute_x_axis_tolerance = 0.01
+        orientation.absolute_y_axis_tolerance = 0.01
+        orientation.absolute_z_axis_tolerance = 0.01
         orientation.weight = 1.0
         constraints.orientation_constraints.append(orientation)
 
@@ -321,9 +325,30 @@ class PhysicsPicker(Node):
             return self._finish(False, gripper_ok, True)
         x, y, z_surface = self._target
 
+        # Stage 1 isolates grasp mechanics from perception. The detector's
+        # observation is still required as a task trigger above, but the grasp
+        # target itself uses simulator ground truth so that lateral alignment
+        # error does not confound the contact result. Stage 2 deliberately
+        # re-injects calibration and vision error on top of this baseline.
+        with self._lock:
+            x = self._latest.object_pose.position.x
+            y = self._latest.object_pose.position.y
+            obj_z = self._latest.object_pose.position.z
+
+        # Compensate the jaw-centre offset. The grasp orientation is a fixed
+        # 180 deg rotation about y, i.e. diag(-1, 1, -1), which maps the TCP
+        # local offset (0, +y, +z) to (0, +y, -z) in world, so the TCP target
+        # is shifted by the negative of that.
+        x = x - self.config.jaw_offset_x
+        y = y - self.config.jaw_offset_y
+        self.get_logger().info(
+            "ground-truth grasp target: x={:.4f} y={:.4f} (detector gave "
+            "x={:.4f} y={:.4f})".format(x, y, self._target[0], self._target[1])
+        )
+
         quat = (0.0, 1.0, 0.0, 0.0)  # tool z pointing down
         hover_z = z_surface + self.config.hover_offset_m
-        grasp_z = z_surface + self.config.grasp_z_offset_m
+        grasp_z = obj_z + self.config.jaw_offset_z
 
         self.set_stage("hover")
         if not self.move_to(x, y, hover_z, quat, tolerance=0.005):
@@ -340,7 +365,14 @@ class PhysicsPicker(Node):
         self.wait_sim(0.5)
 
         self.set_stage("descend")
-        if not self.move_to(x, y, grasp_z, quat, tolerance=0.01):
+        descend_ok = True
+        steps = max(1, self.config.descend_steps)
+        for step in range(1, steps + 1):
+            z_step = hover_z + (grasp_z - hover_z) * float(step) / steps
+            if not self.move_to(x, y, z_step, quat, tolerance=0.003):
+                descend_ok = False
+                break
+        if not descend_ok:
             planning_ok = False
             self.move_to(x, y, hover_z, quat, tolerance=0.02)
             return self._finish(planning_ok, gripper_ok, timed_out)
@@ -361,7 +393,10 @@ class PhysicsPicker(Node):
 
         self.set_stage("lift")
         lift_z = grasp_z + self.config.lift_height_m + 0.01
-        if not self.move_to(x, y, lift_z, quat, tolerance=0.005):
+        # DIAGNOSTIC (coordinator-approved, one bounded test): 10x gentler
+        # lift to test whether contact_lost_during_lift is acceleration-
+        # driven (teleported-qpos arm path) or structural. Revert after.
+        if not self.move_to(x, y, lift_z, quat, tolerance=0.005, velocity_scale=0.05, acceleration_scale=0.05):
             planning_ok = False
             return self._finish(planning_ok, gripper_ok, timed_out)
 

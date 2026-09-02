@@ -22,6 +22,10 @@ class Sample:
     object_x: float
     object_y: float
     object_z: float
+    object_qw: float
+    object_qx: float
+    object_qy: float
+    object_qz: float
     gripper_x: float
     gripper_y: float
     gripper_z: float
