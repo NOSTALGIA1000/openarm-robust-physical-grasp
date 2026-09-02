@@ -2328,7 +2328,7 @@ Run:
 ```bash
 ssh -p 2224 nostalgia@127.0.0.1 "cd ~/ros2_ws_course_repro/ros2_ws/src/openarm_grasp_physics && python3 -m pytest test -q"
 ```
-Expected: `44 passed`.
+Expected: `49 passed` (4 from Task 5 + 5 from Task 6 + 5 from Task 7 + 9 from Task 8 + 6 from Task 9 + 15 from Task 10 + 5 from this task).
 
 - [ ] **Step 6: Mirror and commit**
 
@@ -3192,7 +3192,7 @@ Run:
 ```bash
 ssh -p 2224 nostalgia@127.0.0.1 "cd ~/ros2_ws_course_repro/ros2_ws/src/openarm_grasp_physics && python3 -m pytest test -q"
 ```
-Expected: `44 passed`.
+Expected: at least `49 passed` (the count from Task 11; Tasks 12-13 may add more test files) and zero failures — treat the exact number as a floor, not a fixed target, since prior tasks in this plan have already shown the running total drift upward as tests are added.
 
 Then re-run the existing (read-only) experiment package suite under `openarm_ws` to confirm nothing regressed. This workspace is never edited by this plan; only its tests are executed:
 ```bash
