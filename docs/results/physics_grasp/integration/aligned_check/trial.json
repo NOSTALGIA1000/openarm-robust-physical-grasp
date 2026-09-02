@@ -1,0 +1,47 @@
+{
+  "category": "unilateral_contact",
+  "config": {
+    "close_position": 0.0,
+    "confirm_window_s": 0.3,
+    "contact_confirm_timeout_s": 5.0,
+    "grasp_z_offset_m": 0.0,
+    "gripper_action_timeout_s": 10.0,
+    "hold_duration_s": 2.0,
+    "hover_offset_m": 0.08,
+    "left_finger_geom": "openarm_left_left_finger_collision",
+    "lift_height_m": 0.02,
+    "max_drift_m": 0.01,
+    "min_bilateral_ratio": 0.8,
+    "min_normal_force": 0.5,
+    "object_geom": "physics_object_geom",
+    "open_position": 0.055,
+    "open_tolerance": 0.005,
+    "plan_timeout_s": 30.0,
+    "right_finger_geom": "openarm_left_right_finger_collision",
+    "settle_duration_s": 1.0
+  },
+  "mode": "physics_mode",
+  "observations": {
+    "any_contact": true,
+    "bilateral_confirmed": false,
+    "contact_lost_during_lift": false,
+    "gripper_ok": true,
+    "hold_bilateral_ratio": 0.0,
+    "hold_completed": false,
+    "max_drift_m": 0.0,
+    "max_elevation_m": 4.322870694939418e-05,
+    "planning_ok": true,
+    "timed_out": false
+  },
+  "sample_count": 924,
+  "stage_times": {
+    "close": 322.9000000008137,
+    "descend": 319.6800000007983,
+    "hover": 316.9600000007853,
+    "open": 318.5400000007929,
+    "retreat": 329.5600000008455,
+    "settle": 315.18000000077683
+  },
+  "success": false,
+  "trial_id": "aligned_check"
+}
