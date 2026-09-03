@@ -1,0 +1,245 @@
+[
+  {
+    "mode": "open-loop",
+    "bias": 12,
+    "cat": "success",
+    "elev": 0.02261154085045386,
+    "drift": 0.008566597595329335,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 12,
+    "cat": "success",
+    "elev": 0.027459405875695397,
+    "drift": 0.0065852258324734245,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 12,
+    "cat": "success",
+    "elev": 0.025613512281998763,
+    "drift": 0.006361482641488766,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 20,
+    "cat": "success",
+    "elev": 0.023228195154902875,
+    "drift": 0.008925565311600723,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 20,
+    "cat": "success",
+    "elev": 0.027088962888383417,
+    "drift": 0.006915861923828351,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 20,
+    "cat": "success",
+    "elev": 0.028606906809973187,
+    "drift": 0.006328313400952578,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 24,
+    "cat": "success",
+    "elev": 0.024405698104821294,
+    "drift": 0.009515008511210463,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 24,
+    "cat": "success",
+    "elev": 0.022654602714625605,
+    "drift": 0.009421963271901874,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 24,
+    "cat": "success",
+    "elev": 0.02957878995959351,
+    "drift": 0.006679095393798833,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 28,
+    "cat": "unilateral_contact",
+    "elev": 0.004807448571931494,
+    "drift": 0.0,
+    "hold": 0.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 28,
+    "cat": "unilateral_contact",
+    "elev": 0.007990292996605475,
+    "drift": 0.0,
+    "hold": 0.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 28,
+    "cat": "success",
+    "elev": 0.026549515337995877,
+    "drift": 0.0065196986289294,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 32,
+    "cat": "unilateral_contact",
+    "elev": 0.012876936639873993,
+    "drift": 0.0,
+    "hold": 0.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 32,
+    "cat": "unilateral_contact",
+    "elev": 0.048014705708658845,
+    "drift": 0.0,
+    "hold": 0.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 32,
+    "cat": "unilateral_contact",
+    "elev": 0.022848124485333965,
+    "drift": 0.0,
+    "hold": 0.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 0,
+    "cat": "success",
+    "elev": 0.029439558907122743,
+    "drift": 0.006817298198793519,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 0,
+    "cat": "planning_failure",
+    "elev": 1.2243839234704623e-06,
+    "drift": 0.0,
+    "hold": 0.0,
+    "valid": true
+  },
+  {
+    "mode": "open-loop",
+    "bias": 0,
+    "cat": "success",
+    "elev": 0.024446410120492756,
+    "drift": 0.006363539592483831,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 24,
+    "cat": "success",
+    "elev": 0.02461463153236826,
+    "drift": 0.006216652429929235,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 24,
+    "cat": "success",
+    "elev": 0.027182785899294737,
+    "drift": 0.0066829034352994185,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 24,
+    "cat": "success",
+    "elev": 0.025985398814589333,
+    "drift": 0.006574605727117777,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 28,
+    "cat": "success",
+    "elev": 0.02425821975784853,
+    "drift": 0.007118893646731906,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 28,
+    "cat": "success",
+    "elev": 0.02799978982890733,
+    "drift": 0.006816055480397133,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 28,
+    "cat": "success",
+    "elev": 0.02607816848934713,
+    "drift": 0.006442994808497552,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 32,
+    "cat": "success",
+    "elev": 0.026148550429149986,
+    "drift": 0.008039150187406481,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 32,
+    "cat": "success",
+    "elev": 0.025592099954803826,
+    "drift": 0.006433716572834377,
+    "hold": 1.0,
+    "valid": true
+  },
+  {
+    "mode": "corrected",
+    "bias": 32,
+    "cat": "success",
+    "elev": 0.025039370690595752,
+    "drift": 0.0072858852853652555,
+    "hold": 1.0,
+    "valid": true
+  }
+]
