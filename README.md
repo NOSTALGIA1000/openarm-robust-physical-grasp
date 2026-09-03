@@ -30,18 +30,22 @@ cd vm_sync/experiments/openarm_robust_grasp
 python3 -m pytest tests -q
 ```
 
+## 当前阶段结果
+
+Stage 1 核心命题已验证，原定抬升验收指标在 Stage 1 控制方案下不可达。
+
+- **假绑定已彻底证伪**：错位对照试验 824 采样零接触、物体全程未动；且实测原课程夹爪开口 72 mm 大于 50 mm 物体，本就碰不到，其「抓取」100% 来自软件绑定。
+- **真实双侧夹持可复现**：5 次独立试验全部形成双侧接触，hold 阶段双接触率 5/5 达到 1.00，零数值发散。
+- **未达成抬升**：0/5 达到 20 mm。离线测试台证明夹持静态可抗重力保持，只有手臂运动时失败；加大摩擦或夹持力反而更差。瓶颈是 Stage 1 的 `qpos` 瞬移手臂驱动，需执行器级控制（Stage 3）。
+
+结论文档：[`docs/results/2026-09-03-openarm-stage1-result.md`](docs/results/2026-09-03-openarm-stage1-result.md)
+机制调查全过程：[`docs/results/2026-09-02-openarm-grasp-mechanics-findings.md`](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+
 ## 下一阶段
 
-实施 `physics_mode`：
-
-1. 物体改为自由刚体；
-2. 删除 `cube_x/y/z` 控制和 `teleport_cube()`；
-3. 滑动夹爪改为受限动力学闭合；
-4. 发布双指接触、接触力、物体抬升和相对漂移；
-5. 完成 `20 mm` 抬升、`2 s` 保持、10 次至少成功 8 次的验收；
-6. 通过后加入标定误差和抓取前视觉修正。
-
-设计规范：[`docs/superpowers/specs/2026-09-01-openarm-ros2-physical-grasp-design.md`](docs/superpowers/specs/2026-09-01-openarm-ros2-physical-grasp-design.md)
+1. 确认 Stage 1 验收标准修订：以「抓取形成」判据收口（当前 5/5 通过），抬升/保持/漂移移交 Stage 3。
+2. Stage 3：手臂关节改为执行器级控制，重新评估抬升与保持。
+3. Stage 2：注入手眼标定误差与视觉噪声，比较开环抓取与抓取前视觉修正。
 
 ## 来源与许可
 

@@ -1,0 +1,47 @@
+[
+  {
+    "trial": "f01",
+    "category": "insufficient_lift",
+    "bilateral": true,
+    "hold": 1.0,
+    "elev": 0.0003284713731344646,
+    "samples": 1373,
+    "valid": true
+  },
+  {
+    "trial": "f02",
+    "category": "insufficient_lift",
+    "bilateral": true,
+    "hold": 1.0,
+    "elev": 0.0021824858346726206,
+    "samples": 1333,
+    "valid": true
+  },
+  {
+    "trial": "f03",
+    "category": "insufficient_lift",
+    "bilateral": true,
+    "hold": 1.0,
+    "elev": 0.0004026543744006794,
+    "samples": 1414,
+    "valid": true
+  },
+  {
+    "trial": "f04",
+    "category": "insufficient_lift",
+    "bilateral": true,
+    "hold": 1.0,
+    "elev": 0.0017848916826077033,
+    "samples": 1332,
+    "valid": true
+  },
+  {
+    "trial": "f05",
+    "category": "insufficient_lift",
+    "bilateral": true,
+    "hold": 1.0,
+    "elev": 4.13760644496497e-06,
+    "samples": 1363,
+    "valid": true
+  }
+]
