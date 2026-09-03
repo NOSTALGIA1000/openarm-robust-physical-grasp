@@ -296,37 +296,79 @@
 
     <!-- 左臂 -->
     <joint name="openarm_left_joint1">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">40.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_left_joint2">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">40.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_left_joint3">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">27.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_left_joint4">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">27.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_left_joint5">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">7.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_left_joint6">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">7.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_left_joint7">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">7.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
@@ -339,7 +381,7 @@
       <param name="position_kd">20.0</param>
       <param name="position_i_max">5.0</param>
       <param name="position_i_min">-5.0</param>
-      <param name="position_max_effort">15.0</param>
+      <param name="position_max_effort">25.0</param>
     </joint>
 
     <!-- 右臂 -->

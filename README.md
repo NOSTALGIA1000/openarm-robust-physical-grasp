@@ -32,18 +32,18 @@ python3 -m pytest tests -q
 
 ## 当前阶段结果
 
-Stage 1 核心命题已验证，原定抬升验收指标在 Stage 1 控制方案下不可达。
+**Stage 1 与 Stage 3 均已通过。系统可完成真实物理抓取并抬起物体。**
 
 - **假绑定已彻底证伪**：错位对照试验 824 采样零接触、物体全程未动；且实测原课程夹爪开口 72 mm 大于 50 mm 物体，本就碰不到，其「抓取」100% 来自软件绑定。
-- **Stage 1 验收通过**：修订后标准（抓取形成）正式 10 次验收 **10/10 通过** —— 双侧夹持形成 10/10，hold 双接触率 1.00 共 10/10，数值发散 0/10。
-- **未达成抬升**：0/5 达到 20 mm。离线测试台证明夹持静态可抗重力保持，只有手臂运动时失败；加大摩擦或夹持力反而更差。瓶颈是 Stage 1 的 `qpos` 瞬移手臂驱动，需执行器级控制（Stage 3）。
+- **Stage 1（抓取形成）10/10 通过**：双侧夹持形成 10/10，hold 双接触率 1.00 共 10/10，零发散。
+- **Stage 3（执行器级力控 + 搬运）10/10 通过**：抬升均值 26.4 mm（要求 ≥20）、漂移均值 7.2 mm（要求 ≤10）、hold 双接触率全部 1.00、零发散。
 
-结论文档：[`docs/results/2026-09-03-openarm-stage1-result.md`](docs/results/2026-09-03-openarm-stage1-result.md)
-机制调查全过程：[`docs/results/2026-09-02-openarm-grasp-mechanics-findings.md`](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+抬升成立需要三个条件同时满足：位置指令速度一致（`qvel`）、手臂关节具备转子惯量（`armature`）、执行器级力控（`position_pid` + 力矩钳位）。缺任一条物体都不会离开桌面。
+
+结论文档：[Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
-2. Stage 3：手臂关节改为执行器级控制，重新评估抬升与保持。
 3. Stage 2：注入手眼标定误差与视觉噪声，比较开环抓取与抓取前视觉修正。
 
 ## 来源与许可

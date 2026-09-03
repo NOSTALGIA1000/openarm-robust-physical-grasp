@@ -71,6 +71,7 @@ class PhysicsPicker(Node):
 
         self._max_elevation = 0.0
         self._max_drift = 0.0
+        self._metrics_frozen = False
         self._any_contact = False
         self._bilateral_confirmed = False
         self._contact_lost_during_lift = False
@@ -136,10 +137,11 @@ class PhysicsPicker(Node):
 
             if summary.left_contact or summary.right_contact:
                 self._any_contact = True
-            if height > self._max_elevation:
-                self._max_elevation = height
-            if self._grasp_relative is not None and drift > self._max_drift:
-                self._max_drift = drift
+            if not self._metrics_frozen:
+                if height > self._max_elevation:
+                    self._max_elevation = height
+                if self._grasp_relative is not None and drift > self._max_drift:
+                    self._max_drift = drift
             if stage == "lift" and self._bilateral_confirmed and not summary.bilateral:
                 self._contact_lost_during_lift = True
             if stage == "hold":
@@ -408,6 +410,12 @@ class PhysicsPicker(Node):
 
         self.set_stage("hold")
         hold_completed = self.wait_sim(self.config.hold_duration_s)
+
+        # Spec step 11 (classify) precedes step 12 (retreat), so the graded
+        # metrics are frozen here; the retreat that follows must not change the
+        # verdict it is reported alongside.
+        with self._lock:
+            self._metrics_frozen = True
 
         self.set_stage("retreat")
         self.move_to(x, y, hover_z, quat, tolerance=0.02)

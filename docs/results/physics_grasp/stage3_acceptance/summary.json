@@ -1,0 +1,102 @@
+[
+  {
+    "trial": "s01",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.0268418592093308,
+    "drift": 0.00655028116247001,
+    "n": 1302,
+    "valid": true
+  },
+  {
+    "trial": "s02",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.02821410567802518,
+    "drift": 0.006453893887825698,
+    "n": 1335,
+    "valid": true
+  },
+  {
+    "trial": "s03",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.027681700072009596,
+    "drift": 0.00875227183706847,
+    "n": 1404,
+    "valid": true
+  },
+  {
+    "trial": "s04",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.02653344484283543,
+    "drift": 0.008588733732348428,
+    "n": 1325,
+    "valid": true
+  },
+  {
+    "trial": "s05",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.025581087158711047,
+    "drift": 0.006722336519928467,
+    "n": 1292,
+    "valid": true
+  },
+  {
+    "trial": "s06",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.023506460564662546,
+    "drift": 0.009115531189396741,
+    "n": 1412,
+    "valid": true
+  },
+  {
+    "trial": "s07",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.024034643794310306,
+    "drift": 0.006447052089564799,
+    "n": 1303,
+    "valid": true
+  },
+  {
+    "trial": "s08",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.027586174622746484,
+    "drift": 0.006645860039625397,
+    "n": 1382,
+    "valid": true
+  },
+  {
+    "trial": "s09",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.025681025741559116,
+    "drift": 0.00616869089529717,
+    "n": 1300,
+    "valid": true
+  },
+  {
+    "trial": "s10",
+    "cat": "success",
+    "bil": true,
+    "hold": 1.0,
+    "elev": 0.02821599255045648,
+    "drift": 0.00662495483570024,
+    "n": 1338,
+    "valid": true
+  }
+]

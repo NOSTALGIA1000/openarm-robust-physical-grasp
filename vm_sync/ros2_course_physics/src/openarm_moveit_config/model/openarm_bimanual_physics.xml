@@ -5,15 +5,15 @@
     <joint stiffness="0" ref="0.0" />
     <default class="robot">
       <default class="motor_DM8009">
-        <joint frictionloss="0.1" damping="0.4" limited="true" type="hinge" />
+        <joint armature="0.3" frictionloss="0.1" damping="0.4" limited="true" type="hinge" />
         <motor forcelimited="true" forcerange="-40 40" />
       </default>
       <default class="motor_DM4340">
-        <joint frictionloss="0.1" damping="0.4" limited="true" type="hinge" />
+        <joint armature="0.3" frictionloss="0.1" damping="0.4" limited="true" type="hinge" />
         <motor forcelimited="true" forcerange="-27 27" />
       </default>
       <default class="motor_DM4310">
-        <joint frictionloss="0.1" damping="0.4" limited="true" type="hinge" />
+        <joint armature="0.3" frictionloss="0.1" damping="0.4" limited="true" type="hinge" />
         <motor forcelimited="true" forcerange="-7 7" />
       </default>
       <default class="motor_finger">
@@ -288,7 +288,7 @@
                               quat="1.0 0.0 0.0 0.0" 
                               class="collision" 
                               group="3"    
-                              solimp="0.95 0.99 0.001"           
+                              solimp="0.97 0.995 0.001"           
                               rgba="1 0 0 1"          
                               friction="2.0 1.0 0.01" 
                               condim="6" 
@@ -323,7 +323,7 @@
                               quat="1.0 0.0 0.0 0.0" 
                               class="collision" 
                               group="3"            
-                              solimp="0.95 0.99 0.001"   
+                              solimp="0.97 0.995 0.001"   
                               rgba="1 0 0 1"          
                               friction="2.0 1.0 0.01" 
                               condim="6" 
@@ -504,7 +504,7 @@
                               quat="1.0 0.0 0.0 0.0" 
                               class="collision" 
                               group="3"          
-                              solimp="0.95 0.99 0.001"       
+                              solimp="0.97 0.995 0.001"       
                               friction="1.0 1.0 1.0" 
                               condim="4" 
                               solref="0.02 1"
@@ -534,7 +534,7 @@
                                 quat="1.0 0.0 0.0 0.0" 
                                 class="collision" 
                                 group="3"
-                                solimp="0.95 0.99 0.001"
+                                solimp="0.97 0.995 0.001"
                                 friction="1.0 1.0 1.0" 
                                 condim="4" 
                                 solref="0.02 1"
