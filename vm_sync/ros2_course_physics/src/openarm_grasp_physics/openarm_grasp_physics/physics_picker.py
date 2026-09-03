@@ -60,6 +60,8 @@ class PhysicsPicker(Node):
         self.declare_parameter("calib_bias_y", 0.0)
         self.declare_parameter("vision_noise_std", 0.001)
         self.declare_parameter("visual_correction", False)
+        self.declare_parameter("use_detector_target", False)
+        self.declare_parameter("detector_z_bias", 0.0275)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -70,6 +72,8 @@ class PhysicsPicker(Node):
             calib_bias_y=self.get_parameter("calib_bias_y").value,
             vision_noise_std=self.get_parameter("vision_noise_std").value,
             visual_correction=self.get_parameter("visual_correction").value,
+            use_detector_target=self.get_parameter("use_detector_target").value,
+            detector_z_bias=self.get_parameter("detector_z_bias").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
@@ -347,9 +351,28 @@ class PhysicsPicker(Node):
         # error does not confound the contact result. Stage 2 deliberately
         # re-injects calibration and vision error on top of this baseline.
         with self._lock:
-            x = self._latest.object_pose.position.x
-            y = self._latest.object_pose.position.y
-            obj_z = self._latest.object_pose.position.z
+            true_x = self._latest.object_pose.position.x
+            true_y = self._latest.object_pose.position.y
+            true_z = self._latest.object_pose.position.z
+
+        if self.config.use_detector_target:
+            if not detector_seen:
+                self.get_logger().error(
+                    "use_detector_target is set but the detector never reported; "
+                    "refusing to silently fall back to ground truth")
+                return self._finish(False, gripper_ok, True)
+            dx, dy, dz = self._target
+            x, y = dx, dy
+            obj_z = dz - self.config.detector_z_bias
+            self.get_logger().info(
+                "vision target x={:.4f} y={:.4f} z={:.4f} (detector z {:.4f} "
+                "minus calibrated bias {:.4f}); ground truth was x={:.4f} "
+                "y={:.4f} z={:.4f}, so residual error is x{:+.4f} y{:+.4f} z{:+.4f}"
+                .format(x, y, obj_z, dz, self.config.detector_z_bias,
+                        true_x, true_y, true_z,
+                        x - true_x, y - true_y, obj_z - true_z))
+        else:
+            x, y, obj_z = true_x, true_y, true_z
 
         # Compensate the jaw-centre offset. The grasp orientation is a fixed
         # 180 deg rotation about y, i.e. diag(-1, 1, -1), which maps the TCP

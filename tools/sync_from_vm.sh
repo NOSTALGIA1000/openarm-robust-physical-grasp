@@ -28,6 +28,7 @@ PATHS=(
   "src/openarm_moveit_config/launch/physics_controllers.yaml"
   "src/openarm_moveit_config/launch/move_group_physics.launch.py"
   "src/openarm_moveit_config/launch/run_physics_grasp.launch.py"
+  "src/openarm_moveit_config/launch/apple_detector.py"
 )
 
 for p in "${PATHS[@]}"; do

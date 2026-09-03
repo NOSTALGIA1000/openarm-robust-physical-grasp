@@ -58,6 +58,18 @@ class GraspConfig:
     # mechanics experiment. Stage 2 re-introduces perception deliberately.
     detector_wait_s: float = 20.0
 
+    # --- Vision in the loop ---
+    # Use the detector's own estimate as the grasp target instead of simulator
+    # ground truth. Measured detector error (10 poses, one launch via
+    # /reset_object): lateral 2.1 mm mean / 0.6 sd, depth +27.5 mm mean /
+    # 0.8 sd. The depth term is a constant geometric bias, not noise: the
+    # detector takes the centroid of the largest depth contour and so measures
+    # the object's top face while the target needs its centre. Subtracting the
+    # measured constant is calibration; the residual 0.5-0.8 mm is what a real
+    # system cannot remove.
+    use_detector_target: bool = False
+    detector_z_bias: float = 0.0275
+
     # --- Stage 2: hand-eye calibration error and pre-grasp visual correction ---
     # A miscalibrated camera-to-base transform biases every observation of the
     # object by the same constant vector, so an open-loop grasp inherits it in
