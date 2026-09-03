@@ -126,16 +126,46 @@ Diagnostic details may contain several observed symptoms, but canonical result c
 
 ## Acceptance Criteria
 
-A successful trial requires all conditions:
+**Amended 2026-09-03** after measurement. The original criteria are retained
+below as the Stage 3 target; Stage 1 acceptance is retargeted at grasp
+formation. Rationale and evidence: `docs/results/2026-09-03-openarm-stage1-result.md`.
+
+The amendment was made because the lift requirement was shown to be unreachable
+under Stage 1's control scheme rather than merely untuned. An offline MuJoCo
+harness established that the grasp holds the object against gravity indefinitely
+while the arm is static (15 N over 8 contacts) and fails only when the arm
+moves, and that stiffer contact helps while more friction or grip force makes
+slip worse. The limitation is the position-teleported arm path, which the design
+already defers to Stage 3.
+
+### Stage 1 acceptance (grasp formation)
+
+A successful Stage 1 trial requires all conditions:
 
 - no software attachment or object-position command path active;
-- object maximum elevation at least `0.020 m` above settled baseline;
-- `2.0 s` simulation-time hold completed;
+- bilateral contact confirmed (both named finger geoms in contact with the
+  object, sustained for the confirmation window);
 - bilateral-contact frame ratio during hold at least `0.80`;
-- relative object/gripper translation drift no more than `0.010 m`;
+- no numerical divergence (no `QACC` / "simulation is unstable" warning) and
+  strictly monotonic `sim_time` for the whole trial;
 - no planning, command, or monitoring timeout.
 
-First milestone passes when a fixed deterministic condition produces at least 8 successes in 10 trials. These 10 trials validate repeatability only; they are not a population-level probability estimate.
+Stage 1 passes when a fixed deterministic condition produces at least 8
+successes in 10 trials. These trials validate repeatability only; they are not a
+population-level probability estimate.
+
+Measured 2026-09-03 over 5 validated trials: bilateral grasp formed 5/5, hold
+ratio `1.00` in 5/5, divergence 0/5.
+
+### Stage 3 acceptance (transport), deferred
+
+Evaluated once arm joints are driven by actuators rather than position writes:
+
+- object maximum elevation at least `0.020 m` above settled baseline;
+- `2.0 s` simulation-time hold completed;
+- relative object/gripper translation drift no more than `0.010 m`.
+
+Measured 2026-09-03 under Stage 1 control: elevation criterion 0/5.
 
 ## Data Products
 
@@ -193,11 +223,22 @@ Visual rendering is decimated independently from physics and sensor updates. Val
 
 ## Stage Boundaries
 
-Stage 1 ends at deterministic physical-grasp acceptance. It may include geometry or contact-parameter corrections only when diagnostics identify a cause and each change is recorded.
+**Amended 2026-09-03.** Stage 1 ends at deterministic *grasp-formation*
+acceptance, not at transport. It may include geometry or contact-parameter
+corrections only when diagnostics identify a cause and each change is recorded.
 
 Stage 2 adds controlled target-pose and hand-eye calibration error, then compares open-loop grasp against one pre-grasp visual correction.
 
-Stage 3 evaluates actuator-level arm control, command latency, sensor noise, and limited real-robot transfer.
+Stage 3 evaluates actuator-level arm control, command latency, sensor noise, and limited real-robot transfer. It now also **owns the transport criteria**
+(`0.020 m` lift, `2.0 s` hold, `0.010 m` drift) moved out of Stage 1, because
+those were measured to be unreachable while arm joints are driven by direct
+`qpos` writes rather than actuators.
+
+A prerequisite finding for Stage 3: writing `qpos` without a matching `qvel`
+prevents MuJoCo from transmitting contact friction at all, because friction
+impulse derives from relative velocity at the contact. Any Stage 3 arm-control
+scheme must keep position and velocity consistent, or a held object will not be
+carried regardless of grip force.
 
 Dual-arm handover starts only after single-arm Stage 1 passes. Learned detectors and policies remain outside this design.
 

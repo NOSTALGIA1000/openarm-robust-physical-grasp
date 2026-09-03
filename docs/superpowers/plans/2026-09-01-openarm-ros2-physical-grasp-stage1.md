@@ -37,6 +37,10 @@
   - lift `0.020 m`, hold `2.0 s`, bilateral hold ratio `0.80`, drift `0.010 m`
   - declared: contact normal-force threshold `0.5 N`, bilateral confirmation window `0.30 s`
 - Acceptance run: 10 trials in a fixed deterministic condition, at least 8 successes.
+  **Amended 2026-09-03:** success means grasp formation (bilateral contact
+  confirmed, hold ratio >= `0.80`, no divergence, monotonic `sim_time`). The
+  lift/hold/drift criteria moved to Stage 3 after being measured unreachable
+  under Stage 1's position-teleported arm.
 
 ---
 
@@ -3184,7 +3188,15 @@ ssh -p 2224 nostalgia@127.0.0.1 "rm -rf ~/ros2_ws_course_repro/results/physics_g
 ```
 Expected: `"trials": 10` with a category breakdown.
 
-Stage 1 passes when `"successes"` is at least `8`. If it is lower, return to Task 13 Step 7, record the diagnosis and the parameter change, and re-run. Do not report Stage 1 as passing on a partial result.
+Stage 1 passes when `"successes"` is at least `8`, counting grasp formation per
+the amended criteria above. If it is lower, return to Task 13 Step 7, record the
+diagnosis and the parameter change, and re-run. Do not report Stage 1 as passing
+on a partial result.
+
+The aggregation must additionally reject any trial whose `sim_time` is not
+strictly monotonic or whose launch log contains `unstable`/`QACC`: MuJoCo can
+diverge and silently reset mid-trial while still producing a well-formed
+`trial.json` with a plausible category.
 
 - [ ] **Step 4: Re-run the full Python suite as a regression check**
 
@@ -3244,14 +3256,23 @@ cd "/c/Users/ASUS/Documents/ChatGPT/open-arm相关" && git push origin main
 
 ## Stage 1 Exit Criteria
 
+**Amended 2026-09-03** (user-approved). The transport criteria were measured to
+be unreachable under Stage 1's position-teleported arm and have moved to Stage 3.
+Evidence: `docs/results/2026-09-03-openarm-stage1-result.md`.
+
 Stage 1 is complete when all of these hold:
 
 - no attachment loop, object pose publisher, object controller, or object slide joint exists in any `physics_mode` file;
 - `demo_mode` launches and behaves exactly as before;
 - the static asset tests pass, proving the above by inspection rather than by claim;
 - a misaligned close leaves the object on the table;
-- at least 8 of 10 acceptance trials record `success`, each with elevation at least `0.020 m`, a completed `2.0 s` hold, hold bilateral-contact ratio at least `0.80`, and relative drift at most `0.010 m`;
+- at least 8 of 10 acceptance trials record grasp formation: bilateral contact
+  confirmed, hold bilateral-contact ratio at least `0.80`, no numerical
+  divergence, and strictly monotonic `sim_time`;
 - the full Python suite and the existing experiment suite both pass;
 - results, parameter changes, and caveats are written down and committed.
+
+Moved to Stage 3: elevation at least `0.020 m`, completed `2.0 s` hold, and
+relative drift at most `0.010 m`.
 
 Stage 2 (calibration error and pre-grasp visual correction) begins only after this.
