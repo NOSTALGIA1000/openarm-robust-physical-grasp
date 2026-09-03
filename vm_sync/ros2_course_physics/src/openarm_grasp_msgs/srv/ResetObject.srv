@@ -1,0 +1,13 @@
+# Restore the tracked object to a known pose without restarting the simulator.
+# Simulation time is deliberately NOT reset: /clock consumers and the trial
+# validity guard both rely on sim_time increasing monotonically for the life of
+# the process, and a reset epoch would be indistinguishable from the silent
+# auto-reset MuJoCo performs when it diverges.
+float64 x          # world position; ignored when use_spawn is true
+float64 y
+float64 yaw_deg    # rotation about world z
+bool use_spawn     # restore the pose the scene spawned at
+---
+bool success
+string message
+float64 sim_time   # simulation time at which the reset was applied

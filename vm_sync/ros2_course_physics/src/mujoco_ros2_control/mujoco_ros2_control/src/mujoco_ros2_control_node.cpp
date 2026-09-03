@@ -23,6 +23,7 @@
 
 #include "mujoco_ros2_control/mujoco_cameras.hpp"
 #include "mujoco_ros2_control/mujoco_grasp_telemetry.hpp"
+#include "mujoco_ros2_control/mujoco_scene_reset.hpp"
 #include "mujoco_ros2_control/mujoco_rendering.hpp"
 #include "mujoco_ros2_control/mujoco_ros2_control.hpp"
 
@@ -84,6 +85,9 @@ int main(int argc, const char **argv)
   auto telemetry = std::make_unique<mujoco_ros2_control::MujocoGraspTelemetry>(node);
   telemetry->init(mujoco_model);
 
+  auto scene_reset = std::make_unique<mujoco_ros2_control::MujocoSceneReset>(node);
+  scene_reset->init(mujoco_model, mujoco_data);
+
   // Rendering and camera cadence are decimated independently of physics.
   // Defaults reproduce the original hard-coded 60 Hz viewer / 6 Hz cameras.
   double viewer_render_period = 1.0 / 60.0;
@@ -114,6 +118,11 @@ int main(int argc, const char **argv)
       telemetry->update(mujoco_model, mujoco_data);
     }
     rendering->update();
+
+    // Publishers work without spinning, but service callbacks do not: without
+    // this the /reset_object service advertises and then silently never handles
+    // a request. Cheap here because it only runs once per rendered frame.
+    rclcpp::spin_some(node);
 
     // TODO(eholum): Break control and rendering into separate processes
     if (simstart - last_cam_update > camera_period)

@@ -19,7 +19,11 @@ def generate_launch_description():
     launch_dir = os.path.dirname(__file__)
     model_dir = os.path.join(launch_dir, "..", "model")
 
-    mujoco_xml_file = os.path.join(model_dir, "table_scene_physics.xml")
+    # Scene file is selectable so a batch can randomise the object's initial
+    # pose per trial. Repeating one fixed pose N times measures noise, not
+    # generalisation.
+    scene_name = os.environ.get("PHYSICS_SCENE", "table_scene_physics.xml")
+    mujoco_xml_file = os.path.join(model_dir, scene_name)
     urdf_file = os.path.join(model_dir, "table_scene_physics.urdf")
     controller_config = os.path.join(launch_dir, "physics_controllers.yaml")
     detector_script = os.path.join(launch_dir, "apple_detector.py")
