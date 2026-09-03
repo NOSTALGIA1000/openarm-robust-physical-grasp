@@ -50,17 +50,31 @@ def test_left_finger_uses_bounded_pid_force(urdf_root):
 
     params = {p.get("name"): p.text for p in finger[0].iter("param")}
     assert "position_kp" in params
-    assert float(params["position_max_effort"]) == 20.0
+    assert float(params["position_max_effort"]) == 25.0
 
 
-def test_arm_joints_keep_the_plain_position_interface(urdf_root):
-    control = urdf_root.find("ros2_control")
-    arm = [
-        j for j in control.findall("joint")
-        if j.get("name") == "openarm_left_joint1"
-    ]
-    interfaces = {c.get("name") for c in arm[0].findall("command_interface")}
-    assert interfaces == {"position"}
+def test_arm_joints_use_bounded_pid_force():
+    """Stage 3 moved the arm off direct qpos writes.
+
+    With plain position control the joints are teleported, so the reaction from
+    a 15 N grip pushes the unactuated arm around between control updates and the
+    grasp is lost mid-lift. Bounded PID force lets actuator effort resist that
+    reaction, which is what makes the lift work.
+    """
+    root = ET.parse(URDF).getroot()
+    control = root.find("ros2_control")
+    limits = {1: 40.0, 2: 40.0, 3: 27.0, 4: 27.0, 5: 7.0, 6: 7.0, 7: 7.0}
+    for i, limit in limits.items():
+        joint = [
+            j for j in control.findall("joint")
+            if j.get("name") == "openarm_left_joint%d" % i
+        ]
+        assert len(joint) == 1, "openarm_left_joint%d missing" % i
+        interfaces = {c.get("name") for c in joint[0].findall("command_interface")}
+        assert interfaces == {"position_pid"}, (
+            "joint%d should be force-controlled, got %s" % (i, interfaces))
+        params = {p.get("name"): p.text for p in joint[0].iter("param")}
+        assert float(params["position_max_effort"]) == limit
 
 
 def test_srdf_declares_no_joint_absent_from_the_moveit_model(srdf_root):

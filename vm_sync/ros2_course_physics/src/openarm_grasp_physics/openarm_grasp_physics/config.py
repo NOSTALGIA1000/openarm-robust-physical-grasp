@@ -58,6 +58,18 @@ class GraspConfig:
     # mechanics experiment. Stage 2 re-introduces perception deliberately.
     detector_wait_s: float = 20.0
 
+    # --- Stage 2: hand-eye calibration error and pre-grasp visual correction ---
+    # A miscalibrated camera-to-base transform biases every observation of the
+    # object by the same constant vector, so an open-loop grasp inherits it in
+    # full. A pre-grasp correction re-measures the object RELATIVE to the
+    # gripper, which cancels that common-mode bias and leaves only sensor noise.
+    # Modelling the correction as exact cancellation is an idealisation: a real
+    # servo loop also carries gain, latency and residual-calibration error.
+    calib_bias_x: float = 0.0
+    calib_bias_y: float = 0.0
+    vision_noise_std: float = 0.001
+    visual_correction: bool = False
+
     # Timeouts, all in simulation seconds.
     settle_duration_s: float = 1.0
     contact_confirm_timeout_s: float = 5.0

@@ -9,7 +9,9 @@ because the VM real-time factor is well below 1.0 and wall-clock sleeps are
 therefore not evidence windows.
 """
 
+import dataclasses
 import math
+import random
 import sys
 import threading
 import time
@@ -54,11 +56,21 @@ class PhysicsPicker(Node):
         super().__init__("physics_picker")
 
         self.declare_parameter("trial_id", "trial_000")
+        self.declare_parameter("calib_bias_x", 0.0)
+        self.declare_parameter("calib_bias_y", 0.0)
+        self.declare_parameter("vision_noise_std", 0.001)
+        self.declare_parameter("visual_correction", False)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
 
-        self.config = GraspConfig()
+        self.config = dataclasses.replace(
+            GraspConfig(),
+            calib_bias_x=self.get_parameter("calib_bias_x").value,
+            calib_bias_y=self.get_parameter("calib_bias_y").value,
+            vision_noise_std=self.get_parameter("vision_noise_std").value,
+            visual_correction=self.get_parameter("visual_correction").value,
+        )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
         self.recorder = TrialRecorder(self.output_dir, self.trial_id, self.config)
@@ -345,6 +357,19 @@ class PhysicsPicker(Node):
         # is shifted by the negative of that.
         x = x - self.config.jaw_offset_x
         y = y - self.config.jaw_offset_y
+
+        # Stage 2: the observation the picker acts on is the true pose seen
+        # through a miscalibrated transform, plus sensor noise.
+        rng = random.Random(hash(self.trial_id) & 0xffffffff)
+        true_x, true_y = x, y
+        x = true_x + self.config.calib_bias_x + rng.gauss(0.0, self.config.vision_noise_std)
+        y = true_y + self.config.calib_bias_y + rng.gauss(0.0, self.config.vision_noise_std)
+        self.get_logger().info(
+            "observed target x={:.4f} y={:.4f} (bias {:+.4f},{:+.4f}, noise sd {:.4f})"
+            .format(x, y, self.config.calib_bias_x, self.config.calib_bias_y,
+                    self.config.vision_noise_std))
+        self._true_xy = (true_x, true_y)
+        self._rng = rng
         if detector_seen:
             self.get_logger().info(
                 "ground-truth grasp target: x={:.4f} y={:.4f} (detector gave "
@@ -362,6 +387,17 @@ class PhysicsPicker(Node):
         if not self.move_to(x, y, hover_z, quat, tolerance=0.005):
             planning_ok = False
             return self._finish(planning_ok, gripper_ok, timed_out)
+
+        if self.config.visual_correction:
+            # Re-measure relative to the gripper from the hover pose. A relative
+            # measurement sees the object and the gripper through the same
+            # miscalibrated transform, so the common-mode bias cancels and only
+            # sensor noise remains.
+            tx, ty = self._true_xy
+            x = tx + self._rng.gauss(0.0, self.config.vision_noise_std)
+            y = ty + self._rng.gauss(0.0, self.config.vision_noise_std)
+            self.get_logger().info(
+                "visual correction -> x={:.4f} y={:.4f} (bias cancelled)".format(x, y))
 
         self.set_stage("open")
         if not self.send_gripper(self.config.open_position, -1.0):
