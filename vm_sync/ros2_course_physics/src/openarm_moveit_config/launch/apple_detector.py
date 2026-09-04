@@ -50,12 +50,18 @@ class UniversalDetector(Node):
         self.declare_parameter('gripper_band_above', 0.03)
         self.declare_parameter('gripper_min_area', 15)
         self.declare_parameter('gripper_deep_pct', 60.0)
+        self.declare_parameter('gripper_roi_px', 55)
+        self.declare_parameter('roi_offset_u', 74.0)
+        self.declare_parameter('roi_offset_v', -15.0)
         self.publish_cam = self.get_parameter('publish_camera_frame').value
         self.depth_split = self.get_parameter('depth_split').value
         self.gripper_band_below = self.get_parameter('gripper_band_below').value
         self.gripper_band_above = self.get_parameter('gripper_band_above').value
         self.gripper_min_area = self.get_parameter('gripper_min_area').value
         self.gripper_deep_pct = self.get_parameter('gripper_deep_pct').value
+        self.gripper_roi_px = self.get_parameter('gripper_roi_px').value
+        self.roi_offset_u = self.get_parameter('roi_offset_u').value
+        self.roi_offset_v = self.get_parameter('roi_offset_v').value
         self.obj_cam_pub = self.create_publisher(Point, '/apple_location_cam', 10)
         self.grip_cam_pub = self.create_publisher(Point, '/gripper_location_cam', 10)
         # Kinematics supplies the expected gripper height so the right blob can
@@ -64,7 +70,10 @@ class UniversalDetector(Node):
         # position is still purely optical, so the hand-eye bias that the
         # relative measurement is meant to cancel never enters it.
         self.gripper_z_hint = None
+        self.gripper_point_hint = None
         self.create_subscription(Float64, '/gripper_z_hint', self._on_hint, 10)
+        self.create_subscription(
+            Point, '/gripper_point_hint', self._on_point_hint, 10)
         if self.publish_cam:
             self.get_logger().info(
                 '=== publishing camera-frame points, depth split {:.3f} m ==='
@@ -152,6 +161,72 @@ class UniversalDetector(Node):
             y=float(np.mean((vs - self.cy) * dd / self.fy)),
             z=float(np.mean(dd)),
         )
+
+    def _on_point_hint(self, msg):
+        self.gripper_point_hint = (msg.x, msg.y, msg.z)
+
+    def _project_hint(self):
+        """Pixel of the kinematic gripper point, as the ROI centre.
+
+        Depth banding alone cannot separate hand from forearm: the band must be
+        ~116mm thick to hold enough pixels, and whatever forearm falls inside
+        drags the centroid as the arm configuration changes. Restricting the
+        SEARCH REGION removes the forearm regardless of its depth.
+
+        The projection uses the same (miscalibrated) extrinsic as everything
+        else, so the ROI is displaced by the bias -- harmless, because it only
+        decides where to look. The centroid inside the ROI stays optical.
+        """
+        if self.gripper_point_hint is None:
+            return None
+        pt = PointStamped()
+        pt.header.frame_id = 'world'
+        pt.header.stamp = rclpy.time.Time().to_msg()
+        pt.point.x, pt.point.y, pt.point.z = self.gripper_point_hint
+        try:
+            tf = self.tf_buffer.lookup_transform(
+                'camera_optical_frame', 'world', rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.2))
+            cam = tf2_geometry_msgs.do_transform_point(pt, tf).point
+        except Exception:
+            return None
+        if cam.z <= 0.05:
+            return None
+        # The gripper frame's origin is not what the camera sees: the visible
+        # palm/wrist surface sits ~76mm behind it toward the base, a measured
+        # +74px, -15px in image space. Without this the ROI lands beside the
+        # hand and catches 6-11 pixels instead of the hundreds it needs.
+        # Valid because the hover orientation is fixed (quat 0,1,0,0); a
+        # different wrist attitude would need this re-measured.
+        return (self.cx + cam.x * self.fx / cam.z + self.roi_offset_u,
+                self.cy + cam.y * self.fy / cam.z + self.roi_offset_v)
+
+    def _roi_centroid_cam(self, depth_img, lo, hi, centre):
+        """Deepest-percentile 3D centroid inside a ROI around `centre`."""
+        u0, v0 = centre
+        h, w = depth_img.shape
+        r = int(self.gripper_roi_px)
+        u1, u2 = max(0, int(u0) - r), min(w, int(u0) + r + 1)
+        v1, v2 = max(0, int(v0) - r), min(h, int(v0) + r + 1)
+        if u2 <= u1 or v2 <= v1:
+            return None, 0
+        roi = np.zeros(depth_img.shape, bool)
+        roi[v1:v2, u1:u2] = True
+        sel = roi & (depth_img > lo) & (depth_img < hi)
+        n = int(sel.sum())
+        if n < 40:
+            return None, n
+        cut = float(np.percentile(depth_img[sel], self.gripper_deep_pct))
+        sel &= depth_img >= cut
+        if sel.sum() < 8:
+            return None, n
+        vs, us = np.nonzero(sel)
+        dd = depth_img[sel].astype(np.float64)
+        return Point(
+            x=float(np.mean((us - self.cx) * dd / self.fx)),
+            y=float(np.mean((vs - self.cy) * dd / self.fy)),
+            z=float(np.mean(dd)),
+        ), n
 
     def _blob_diag(self, depth_img, lo, hi, min_area):
         """Describe the blob that would be selected, to identify misselection.
@@ -249,14 +324,20 @@ class UniversalDetector(Node):
         lo = max(0.30, expected - self.gripper_band_below)
         hi = min(self.depth_split, expected + self.gripper_band_above)
         npix = int(((cv_image > lo) & (cv_image < hi)).sum())
-        grip = self._deep_centroid_cam(
-            cv_image, lo, hi, self.gripper_min_area)
+        centre = self._project_hint()
+        if centre is None:
+            grip, nroi = self._deep_centroid_cam(
+                cv_image, lo, hi, self.gripper_min_area), -1
+        else:
+            grip, nroi = self._roi_centroid_cam(cv_image, lo, hi, centre)
         self.get_logger().info(
             "gripper band hint_z=%.3f expected_depth=%.3f band=%.3f..%.3f "
             "pixels=%d out=%s | %s"
             % (self.gripper_z_hint, expected, lo, hi, npix,
                ("%.4f,%.4f,%.4f" % (grip.x, grip.y, grip.z)) if grip else "NONE",
-               self._blob_diag(cv_image, lo, hi, self.gripper_min_area)),
+               ("roi=%s n=%d | " % (
+                   ("%.0f,%.0f" % centre) if centre else "NONE", nroi))
+               + self._blob_diag(cv_image, lo, hi, self.gripper_min_area)),
             throttle_duration_sec=0.4)
         if grip is not None:
             self.grip_cam_pub.publish(grip)

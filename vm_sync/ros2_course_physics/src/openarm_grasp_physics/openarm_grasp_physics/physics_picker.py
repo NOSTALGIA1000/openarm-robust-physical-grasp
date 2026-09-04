@@ -123,6 +123,11 @@ class PhysicsPicker(Node):
         # rest of the arm in the depth image. Selection aid only; the detector's
         # published position stays optical.
         self.hint_pub = self.create_publisher(Float64, "/gripper_z_hint", 10)
+        # Full gripper position, so the detector can project it and search
+        # only a small region around it. Same principle as the z hint: this
+        # picks WHERE to look, never what the measurement reads.
+        self.point_hint_pub = self.create_publisher(
+            Point, "/gripper_point_hint", 10)
 
         self.move_client = ActionClient(self, MoveGroup, "move_action")
         self.gripper_client = ActionClient(self, GripperCommand, GRIPPER_ACTION)
@@ -489,6 +494,10 @@ class PhysicsPicker(Node):
             hint.data = float(hover_z)
             for _ in range(12):
                 self.hint_pub.publish(hint)
+                with self._lock:
+                    gp = self._latest.gripper_pose.position
+                    ph = Point(x=gp.x, y=gp.y, z=gp.z)
+                self.point_hint_pub.publish(ph)
                 time.sleep(0.1)
 
             obj_cam, grip_cam = self._wait_relative_pair(
