@@ -32,7 +32,11 @@ sleep 3
 # 1b. Restart the ros2 CLI daemon. A stale daemon makes 'ros2 control'
 #     commands fail with '!rclpy.ok()' and return empty listings, which looks
 #     exactly like controllers failing to load.
-(ros2 daemon stop >/dev/null 2>&1) || true
+# Bound this: 'ros2 daemon stop' has been observed to hang forever (once for
+# 11.6 h, silently stalling an entire overnight batch at trial 3 of 11). It is
+# best-effort only -- the kill -9 below is what actually guarantees the daemon
+# is gone.
+timeout 20 ros2 daemon stop >/dev/null 2>&1 || true
 ps -u "$USER" -o pid=,args= | grep 'ros2cli.daemon' | grep -v grep | awk '{print $1}' | xargs -r kill -9 2>/dev/null
 sleep 2
 

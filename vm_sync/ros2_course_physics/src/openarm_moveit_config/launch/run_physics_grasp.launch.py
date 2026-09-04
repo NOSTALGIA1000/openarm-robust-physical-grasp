@@ -58,10 +58,22 @@ def generate_launch_description():
         parameters=[{"robot_description": robot_desc, "use_sim_time": True}],
     )
 
+    # Hand-eye calibration error, modeled where it actually lives: a translation
+    # error in the camera->world extrinsic, not a synthetic offset added after
+    # the fact to ground truth. Because this transform's rotation is identity,
+    # the bias composes as a plain vector add and reaches the detector's
+    # world-frame output 1:1, so CAM_BIAS_X/Y can reuse Stage 2's exact sweep
+    # grid for a directly comparable curve driven by a real detector instead
+    # of a synthetic Gaussian.
+    cam_bias_x = float(os.environ.get("CAM_BIAS_X", "0.0"))
+    cam_bias_y = float(os.environ.get("CAM_BIAS_Y", "0.0"))
     tf_world_to_cam = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0.5", "0", "1.2", "0", "0", "0", "1", "world", "camera_base_link"],
+        arguments=[
+            str(0.5 + cam_bias_x), str(0.0 + cam_bias_y), "1.2",
+            "0", "0", "0", "1", "world", "camera_base_link",
+        ],
         output="screen",
     )
 

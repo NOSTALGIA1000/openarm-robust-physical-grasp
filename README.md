@@ -41,17 +41,18 @@ python3 -m pytest tests -q
 - **泛化验证**：随机初始位姿（位移 ±6 mm、偏航 0–±45°）**12/12**。姿态自对齐经四元数记录证实——角点夹持在抬升载荷下自发转为面对齐。容差**各向异性**——完整表述是 24–35 mm，最严方向为钳口闭合方向（y），非单轴时早先测得的 24 mm。
 - **探测器真实精度已测**：横向 2.1 mm（不是瓶颈），深度 +27.5 mm 恒定几何偏置（探测器测物体顶面而非中心，非噪声，可标定扣除）。发现探测器**永久锁定首次读数**，此前 Stage 2 的"抓取前视觉修正"建模的重新测量机制实际并不存在，已订正并加 `lock_first_detection` 开关解锁。
 - **视觉闭环第一步（接入）已验证**：探测器输出接入抓取目标（扣除已测偏置）3/3 干净复现成功，指标与真值驱动持平。副产品：定位并避开一个仪器复用伪影——复用实例时手臂停留在上次 retreat 位置会挡住探测器视野。
+- **视觉闭环第二步（真实感知重测容差）已完成**：标定偏置改为注入相机→世界外参，探测器真实误差随之进入回路。19 次试验，断崖仍在 **24–32 mm**，与合成高斯模型的曲线一致——**Stage 2 的容差结论经真实感知链路验证成立**。附带暴露一个度量陷阱：单指蹭起物体可产生 28 mm 抬升却零双侧接触，只看抬升会把 0/4 误判成 2/4。
 
 抬升成立需三条同时满足：位置指令速度一致（`qvel`）、手臂关节具备转子惯量（`armature`）、执行器级力控（`position_pid` + 力矩钳位）。
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[视觉闭环第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[视觉闭环第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [视觉闭环第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
-1. **用真实探测器误差重跑标定容差实验**——位姿随机化 + 探测器实测误差替代 Stage 2 的合成高斯偏置，看容差断崖是否还落在 24–32 mm（进行中）。
-2. **用已解锁的探测器实现真正的抓取前重新探测**，做开环 vs 闭环对照，区别于 Stage 2 理想化的相对测量上界。
+1. **用已解锁的探测器实现真正的抓取前重新探测**，做开环 vs 闭环对照，区别于 Stage 2 理想化的相对测量上界（进行中）。
+2. 位姿随机化下重测真实感知容差（当前真实探测器曲线为固定初始位姿）。
 3. 加密断崖附近采样（24/26/28/30 mm，每格 10 次以上），给出阈值与置信区间。
 4. 扫描预张开开度，验证容差是否随余隙线性提高。
 5. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
