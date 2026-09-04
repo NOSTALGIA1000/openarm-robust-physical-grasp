@@ -31,7 +31,7 @@ from moveit_msgs.msg import (
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from shape_msgs.msg import SolidPrimitive
-from std_msgs.msg import Header
+from std_msgs.msg import Float64, Header
 
 from openarm_grasp_msgs.msg import GraspRawState
 from openarm_grasp_physics.config import GraspConfig
@@ -63,6 +63,10 @@ class PhysicsPicker(Node):
         self.declare_parameter("use_detector_target", False)
         self.declare_parameter("detector_z_bias", 0.0275)
         self.declare_parameter("pregrasp_redetect", False)
+        self.declare_parameter("relative_correction", False)
+        self.declare_parameter("rel_offset_x", 0.0)
+        self.declare_parameter("rel_offset_y", 0.0)
+        self.declare_parameter("rehover_after_correction", True)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -76,6 +80,11 @@ class PhysicsPicker(Node):
             use_detector_target=self.get_parameter("use_detector_target").value,
             detector_z_bias=self.get_parameter("detector_z_bias").value,
             pregrasp_redetect=self.get_parameter("pregrasp_redetect").value,
+            relative_correction=self.get_parameter("relative_correction").value,
+            rel_offset_x=self.get_parameter("rel_offset_x").value,
+            rel_offset_y=self.get_parameter("rel_offset_y").value,
+            rehover_after_correction=self.get_parameter(
+                "rehover_after_correction").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
@@ -99,11 +108,21 @@ class PhysicsPicker(Node):
         self._target = None
         self._target_latest = None
         self._target_seq = 0
+        self._obj_cam = None
+        self._grip_cam = None
+        self._cam_seq = 0
         self.create_subscription(Point, "/apple_location", self._on_target, 10)
+        self.create_subscription(Point, "/apple_location_cam", self._on_obj_cam, 10)
+        self.create_subscription(
+            Point, "/gripper_location_cam", self._on_grip_cam, 10)
         self.create_subscription(
             GraspRawState, "/grasp_raw_state", self._on_telemetry, 50
         )
         self.scene_pub = self.create_publisher(PlanningScene, "/planning_scene", 10)
+        # Expected gripper height, so the detector can tell the hand from the
+        # rest of the arm in the depth image. Selection aid only; the detector's
+        # published position stays optical.
+        self.hint_pub = self.create_publisher(Float64, "/gripper_z_hint", 10)
 
         self.move_client = ActionClient(self, MoveGroup, "move_action")
         self.gripper_client = ActionClient(self, GripperCommand, GRIPPER_ACTION)
@@ -122,6 +141,31 @@ class PhysicsPicker(Node):
             # fresh observation from a stale one.
             self._target_latest = (msg.x, msg.y, msg.z)
             self._target_seq += 1
+
+    def _on_obj_cam(self, msg):
+        with self._lock:
+            self._obj_cam = (msg.x, msg.y, msg.z)
+
+    def _on_grip_cam(self, msg):
+        with self._lock:
+            self._grip_cam = (msg.x, msg.y, msg.z)
+            self._cam_seq += 1
+
+    def _wait_relative_pair(self, timeout_s):
+        """Wait for a gripper reading paired with an object reading.
+
+        The gripper is only visible once the arm is at the hover pose, so this
+        gates on the gripper stream and takes the object reading alongside it.
+        """
+        with self._lock:
+            seq0 = self._cam_seq
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            with self._lock:
+                if self._cam_seq > seq0 and self._obj_cam and self._grip_cam:
+                    return self._obj_cam, self._grip_cam
+            time.sleep(0.05)
+        return None, None
 
     def _wait_fresh_target(self, timeout_s):
         """Block until the detector publishes a new fix. None on timeout."""
@@ -436,6 +480,56 @@ class PhysicsPicker(Node):
         if not self.move_to(x, y, hover_z, quat, tolerance=0.005):
             planning_ok = False
             return self._finish(planning_ok, gripper_ok, timed_out)
+
+        if self.config.relative_correction:
+            # Tell the detector where the hand is so it can pick the hand's blob
+            # rather than a higher arm segment. This is a selection aid: the
+            # measured position it publishes is still purely optical.
+            hint = Float64()
+            hint.data = float(hover_z)
+            for _ in range(12):
+                self.hint_pub.publish(hint)
+                time.sleep(0.1)
+
+            obj_cam, grip_cam = self._wait_relative_pair(
+                self.config.redetect_timeout_s)
+            if obj_cam is None:
+                self.get_logger().error(
+                    "relative_correction is set but no paired object/gripper "
+                    "observation arrived within {:.1f}s (needs "
+                    "DETECTOR_CAM_FRAME=1)".format(self.config.redetect_timeout_s))
+                return self._finish(planning_ok, gripper_ok, True)
+
+            with self._lock:
+                gx = self._latest.gripper_pose.position.x
+                gy = self._latest.gripper_pose.position.y
+
+            # camera_optical -> world is a 180 deg rotation about x, i.e.
+            # diag(1, -1, -1); world -> camera_base_link carries no rotation.
+            rel_x = obj_cam[0] - grip_cam[0]
+            rel_y = -(obj_cam[1] - grip_cam[1])
+
+            new_x = gx + rel_x - self.config.rel_offset_x - self.config.jaw_offset_x
+            new_y = gy + rel_y - self.config.rel_offset_y - self.config.jaw_offset_y
+            self.get_logger().info(
+                "relative correction -> x={:.4f} y={:.4f} (was x={:.4f} y={:.4f}); "
+                "gripper_kin x={:.4f} y={:.4f}, optical rel x{:+.4f} y{:+.4f}; "
+                "ground truth x={:.4f} y={:.4f}, so residual error is "
+                "x{:+.4f} y{:+.4f}".format(
+                    new_x, new_y, x, y, gx, gy, rel_x, rel_y, gt_x, gt_y,
+                    new_x - gt_x, new_y - gt_y))
+            x, y = new_x, new_y
+
+            # Re-hover over the corrected point before descending. Without this
+            # the arm is still parked at the biased pose and the descent becomes
+            # a diagonal sweep that drags the open jaws sideways at low
+            # altitude, striking the object -- the unilateral_contact mode from
+            # Stage 2. Correcting the target does not by itself correct the
+            # path taken to it.
+            if self.config.rehover_after_correction:
+                if not self.move_to(x, y, hover_z, quat, tolerance=0.005):
+                    planning_ok = False
+                    return self._finish(planning_ok, gripper_ok, timed_out)
 
         if self.config.pregrasp_redetect:
             # Genuine second observation from the hover pose, as opposed to the

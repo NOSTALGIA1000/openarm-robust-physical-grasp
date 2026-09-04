@@ -109,11 +109,14 @@ def generate_launch_description():
     # re-detection needs. Default stays latched: that is the course demo's
     # behaviour and every earlier experiment ran with it.
     detector_unlatched = os.environ.get("DETECTOR_UNLATCHED", "0") == "1"
+    detector_cam_frame = os.environ.get("DETECTOR_CAM_FRAME", "0") == "1"
     node_detector = ExecuteProcess(
         cmd=["python3", detector_script, "--ros-args",
              "-p", "use_sim_time:=true",
              "-p", "lock_first_detection:={}".format(
-                 "false" if detector_unlatched else "true")],
+                 "false" if detector_unlatched else "true"),
+             "-p", "publish_camera_frame:={}".format(
+                 "true" if detector_cam_frame else "false")],
         output="screen",
     )
 

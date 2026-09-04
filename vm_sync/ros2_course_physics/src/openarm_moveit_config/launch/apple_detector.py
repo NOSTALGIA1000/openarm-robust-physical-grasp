@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from std_msgs.msg import Float64
 from geometry_msgs.msg import Point, PointStamped
 from cv_bridge import CvBridge
 import cv2
@@ -32,8 +33,40 @@ class UniversalDetector(Node):
         self.bridge = CvBridge()
         self.subscription = self.create_subscription(
             Image, self.depth_topic, self.listener_callback, 10)
-        
+
         self.coord_pub = self.create_publisher(Point, '/apple_location', 10)
+
+        # --- Relative measurement support ---
+        # A hand-eye translation error cannot be removed by re-observing the
+        # object: the same wrong extrinsic returns the same wrong world point.
+        # It cancels only in a difference of two points seen through that same
+        # extrinsic, so the gripper has to be measured optically as well.
+        # Object and gripper overlap in the image at the hover pose but are
+        # well separated in depth (gripper ~0.68 m, object top ~0.74 m), so the
+        # split is done on depth, not on contours.
+        self.declare_parameter('publish_camera_frame', False)
+        self.declare_parameter('depth_split', 0.71)
+        self.declare_parameter('gripper_band_below', 0.09)
+        self.declare_parameter('gripper_band_above', 0.03)
+        self.declare_parameter('gripper_min_area', 15)
+        self.publish_cam = self.get_parameter('publish_camera_frame').value
+        self.depth_split = self.get_parameter('depth_split').value
+        self.gripper_band_below = self.get_parameter('gripper_band_below').value
+        self.gripper_band_above = self.get_parameter('gripper_band_above').value
+        self.gripper_min_area = self.get_parameter('gripper_min_area').value
+        self.obj_cam_pub = self.create_publisher(Point, '/apple_location_cam', 10)
+        self.grip_cam_pub = self.create_publisher(Point, '/gripper_location_cam', 10)
+        # Kinematics supplies the expected gripper height so the right blob can
+        # be picked: a plain near-depth band selects whichever arm segment is
+        # highest, not the hand. This gates SELECTION only -- the published
+        # position is still purely optical, so the hand-eye bias that the
+        # relative measurement is meant to cancel never enters it.
+        self.gripper_z_hint = None
+        self.create_subscription(Float64, '/gripper_z_hint', self._on_hint, 10)
+        if self.publish_cam:
+            self.get_logger().info(
+                '=== publishing camera-frame points, depth split {:.3f} m ==='
+                .format(self.depth_split))
         
         # --- 修改点1：状态变量 ---
         self.fixed_world_point = None  # 用于存储锁定的坐标
@@ -50,7 +83,122 @@ class UniversalDetector(Node):
         
         self.get_logger().info("=== 绝对坐标检测器启动 ===")
 
+    def _blob_centroid_cam(self, depth_img, lo, hi, min_area=50):
+        """Camera-frame centroid of the largest blob within a depth band."""
+        mask = (((depth_img > lo) & (depth_img < hi)) * 255).astype(np.uint8)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return None
+        largest = max(contours, key=cv2.contourArea)
+        if cv2.contourArea(largest) < min_area:
+            return None
+        M = cv2.moments(largest)
+        if M["m00"] == 0:
+            return None
+        u = int(M["m10"] / M["m00"])
+        v = int(M["m01"] / M["m00"])
+        d = float(depth_img[v, u])
+        if not (lo < d < hi):
+            # Centroid can fall off the blob for a concave shape; fall back to
+            # the band's mean depth rather than reporting a bogus range.
+            band = depth_img[(depth_img > lo) & (depth_img < hi)]
+            if band.size == 0:
+                return None
+            d = float(np.mean(band))
+        return Point(
+            x=float((u - self.cx) * d / self.fx),
+            y=float((v - self.cy) * d / self.fy),
+            z=d,
+        )
+
+    def _on_hint(self, msg):
+        self.gripper_z_hint = float(msg.data)
+
+    def _camera_world_z(self):
+        try:
+            tf = self.tf_buffer.lookup_transform(
+                'world', 'camera_optical_frame', rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.2))
+            return tf.transform.translation.z
+        except Exception:
+            return None
+
+    def _log_blob_structure(self, depth_img):
+        """Log the depth structure so bands are set from data, not guesswork."""
+        mask = (((depth_img > 0.30) & (depth_img < 0.75)) * 255).astype(np.uint8)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        parts = []
+        for c in sorted(contours, key=cv2.contourArea, reverse=True)[:3]:
+            area = cv2.contourArea(c)
+            if area < 50:
+                continue
+            blob = np.zeros(depth_img.shape, np.uint8)
+            cv2.drawContours(blob, [c], -1, 255, -1)
+            d = depth_img[blob > 0]
+            parts.append("area=%d depth min/med/max=%.3f/%.3f/%.3f"
+                         % (area, float(d.min()), float(np.median(d)), float(d.max())))
+        if parts:
+            self.get_logger().info("blobs: " + " | ".join(parts),
+                                   throttle_duration_sec=1.0)
+
+    def publish_camera_frame_points(self, cv_image):
+        """Publish object and gripper positions in the camera optical frame.
+
+        These are raw optical measurements: they never pass through the
+        camera->world extrinsic, so a miscalibration of it cannot corrupt
+        their difference.
+        """
+        self._log_blob_structure(cv_image)
+        obj = self._blob_centroid_cam(cv_image, self.depth_split, 0.75)
+        if obj is not None:
+            self.obj_cam_pub.publish(obj)
+
+        # Without a hint there is no way to tell the hand from any other arm
+        # segment in the near band, so publish nothing rather than publish the
+        # wrong body: a silently mis-selected blob is worse than no reading.
+        if self.gripper_z_hint is None:
+            return
+        cam_z = self._camera_world_z()
+        if cam_z is None:
+            return
+        # Asymmetric band: at the TCP height itself the hand shows only a thin
+        # sliver (measured: 41 px, too few to be a stable centroid), so the band
+        # is extended towards the camera to take in the hand body. It must stop
+        # short of the object at 0.736 and of the forearm, which sits much
+        # nearer at ~0.45.
+        expected = cam_z - self.gripper_z_hint
+        lo = max(0.30, expected - self.gripper_band_below)
+        hi = min(self.depth_split, expected + self.gripper_band_above)
+        npix = int(((cv_image > lo) & (cv_image < hi)).sum())
+        grip = self._blob_centroid_cam(
+            cv_image, lo, hi, min_area=self.gripper_min_area)
+        self.get_logger().info(
+            "gripper band hint_z=%.3f expected_depth=%.3f band=%.3f..%.3f "
+            "pixels=%d -> %s" % (self.gripper_z_hint, expected, lo, hi, npix,
+                                 "published" if grip else "NO BLOB"),
+            throttle_duration_sec=1.0)
+        if grip is not None:
+            self.grip_cam_pub.publish(grip)
+
     def listener_callback(self, msg):
+        # Camera-frame points are published on every frame, independently of the
+        # latch below: the relative measurement needs a live gripper reading at
+        # the hover pose, which is long after the world-frame fix is latched.
+        # The decoded image is reused by phase B so a frame is never converted
+        # twice.
+        cv_image = None
+        if self.publish_cam:
+            try:
+                cv_image = np.nan_to_num(
+                    self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough'),
+                    nan=10.0)
+                self.publish_camera_frame_points(cv_image)
+            except Exception as e:
+                self.get_logger().error(f"camera-frame publish failed: {e}")
+                cv_image = None
+
         # ==========================================
         # 阶段 A: 已经锁定目标 -> 持续广播 + 限时日志
         # ==========================================
@@ -73,8 +221,9 @@ class UniversalDetector(Node):
         # 阶段 B: 尚未锁定 -> 寻找目标
         # ==========================================
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-            cv_image = np.nan_to_num(cv_image, nan=10.0)
+            if cv_image is None:
+                cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+                cv_image = np.nan_to_num(cv_image, nan=10.0)
 
             # 简单的深度分割提取物体 (0.3m ~ 1.5m 范围内)
             mask = (cv_image < 0.75) & (cv_image > 0.3)

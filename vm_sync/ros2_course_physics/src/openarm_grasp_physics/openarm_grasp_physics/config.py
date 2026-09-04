@@ -78,6 +78,24 @@ class GraspConfig:
     pregrasp_redetect: bool = False
     redetect_timeout_s: float = 5.0
 
+    # Relative (differential) visual correction. Measures object and gripper
+    # optically in the camera frame and adds their difference to the gripper
+    # pose known from kinematics:
+    #     target = gripper_kin + R * (object_cam - gripper_cam)
+    # A translation error in the camera->world extrinsic enters both optical
+    # terms identically and cancels in the subtraction, which plain
+    # re-detection cannot do. What remains is a fixed geometric offset: the
+    # camera sees each body's upper surface rather than its frame origin. That
+    # offset does not scale with calibration error, so it is calibrated once
+    # and subtracted, exactly like detector_z_bias.
+    relative_correction: bool = False
+    rel_offset_x: float = 0.0
+    rel_offset_y: float = 0.0
+    # Return to hover over the corrected point before descending, so the lateral
+    # move happens at a safe height instead of as a diagonal sweep past the
+    # object with the jaws open.
+    rehover_after_correction: bool = True
+
     # --- Stage 2: hand-eye calibration error and pre-grasp visual correction ---
     # A miscalibrated camera-to-base transform biases every observation of the
     # object by the same constant vector, so an open-loop grasp inherits it in
