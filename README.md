@@ -48,22 +48,24 @@ python3 -m pytest tests -q
 - **视觉反馈改变了瓶颈所在的轴**：开环最严方向是 y（24–32 mm），相对修正后最严方向变成 x（80 mm）。第四步「提高 4–6 倍」只对 y 向成立。
 - **存在轴间串扰**：x 单轴偏置会在无 y 偏置时产生 y 向残差（64 mm 处约 −19 mm），大偏置下的失败由 **y 串扰越过 y 容差**触发，而非 x 本身越界。这推翻了先前基于二维 (48,48) 4/4 得出的「逐轴独立」断言——48 mm 处串扰太小，掩盖了耦合。
 - **一处方法学失误**：x 向初版只取 48 与 96 mm 两点，把上限低估约一半（实为 80–96 mm）。断崖两侧各取一点会把「未测」误读成「已测得的上限」。
+- **视觉闭环第六步（位姿随机化）12/12**：12 组随机位姿（位移 ±6 mm、偏航 0–±45°）叠加 y=64 mm 标定偏置，**全部成功**，含两次 ±45°。残差与固定位姿下同量级（x 均值 −6.9 mm、y 均值 +4.2 mm），说明**位姿变化几乎不影响相对测量精度**。补上了第四、五步「全部试验用同一初始位姿」的最后一处泛化缺口。
+- **一次差点被当成结论的装置故障**：该批首轮 12 次全败，看似「位姿随机化下相对修正完全失效」。可疑点是失败过于整齐——y 残差全部约 −64 mm，恰等于注入偏置。根因是运行器合成时残留了一行原始变量定义，把 `rel_offset_y` 覆盖成了 `CAM_BIAS_Y`。**固定位姿下同一代码 2/2、随机位姿全败，这个反差就是查装置的信号。**
 - **另一条独立结论：修正目标 ≠ 修正路径。** 64 mm 处目标已修正到 3 mm 内却仍 0/2 全败，因为手臂仍从带偏置的位置斜线下降、张口横扫撞到物体；仅加一步「回到修正点上方再垂直下降」即变为 2/2。
 
 抬升成立需三条同时满足：位置指令速度一致（`qvel`）、手臂关节具备转子惯量（`armature`）、执行器级力控（`position_pid` + 力矩钳位）。
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[视觉闭环第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[视觉闭环第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
 1. **查清 192 mm 处的失效机制**——透视与深度语义假设均已被数据否定；现有证据指向大偏置下手臂构型变化引起的分割抖动，需记录夹爪姿态四元数才能验证。
 2. 加密 y 向 128–192 mm 之间的采样，给出新阈值与置信区间。
-3. 位姿随机化下验证相对修正（当前为固定初始位姿）。
-4. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
-5. 扫描预张开开度，验证开环容差是否随余隙线性提高。
-6. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
+3. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
+4. 扫描预张开开度，验证开环容差是否随余隙线性提高。
+5. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
+6. 随机位姿下补测 x 向与二维联合（当前只测了 y=64 mm 一点）。
 
 ## 来源与许可
 

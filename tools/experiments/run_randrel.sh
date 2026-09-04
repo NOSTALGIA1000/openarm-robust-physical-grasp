@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Relative (differential) visual correction: object and gripper both measured
+# optically, so a hand-eye translation error cancels in their difference.
+# Fresh launch per trial (a parked arm from a previous trial pollutes the
+# camera view -- see the 2026-09-04 vision-in-loop documents).
+export MUJOCO_DIR=/home/nostalgia/.local/lib/python3.10/site-packages/mujoco
+export DISPLAY=:0
+TRIAL="$1"; DX="$2"; DY="$3"; YAW="$4"
+export CAM_BIAS_X="${5:-0.0}"; export CAM_BIAS_Y="${6:-0.0}"
+OUTDIR="${7:-stage8_randrel}"; OFFX="${8:-0.0}"; OFFY="${9:-0.0}"
+export DETECTOR_UNLATCHED=1
+export DETECTOR_CAM_FRAME=1
+MODEL="$HOME/ros2_ws_course_repro/ros2_ws/src/openarm_moveit_config/model"
+SCENE="_rand_${TRIAL}.xml"
+export DETECTOR_UNLATCHED=1
+export DETECTOR_CAM_FRAME=1
+source /opt/ros/humble/setup.bash
+source "$HOME/ros2_ws_course_repro/ros2_ws/install_repro/setup.bash"
+export ROS_DOMAIN_ID=71
+LOG="/tmp/physics_launch_${TRIAL}.log"
+OUT="$HOME/ros2_ws_course_repro/results/physics_grasp/$OUTDIR"
+mkdir -p "$OUT"
+bash /tmp/preflight.sh 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
+python3 /tmp/add_pose_rand.py 0 "$DX" "$DY" "$YAW" "$SCENE" >/dev/null || exit 6
+cp "$MODEL/$SCENE" "$HOME/ros2_ws_course_repro/ros2_ws/install_repro/openarm_moveit_config/share/openarm_moveit_config/model/$SCENE"
+export PHYSICS_SCENE="$SCENE"
+setsid nohup ros2 launch openarm_moveit_config run_physics_grasp.launch.py viewer_render_period:=1.0 > "$LOG" 2>&1 < /dev/null &
+for i in $(seq 1 120); do grep -q 'Successfully loaded controller' "$LOG" 2>/dev/null && break; sleep 3; done
+for k in $(seq 1 60); do ros2 action list 2>/dev/null | grep -q '/move_action' && break; sleep 2; done
+sleep 6
+strip(){ sed 's/\x1b\[[0-9;]*m//g'; }
+is_active(){ ros2 control list_controllers 2>/dev/null | strip | awk -v c="$1" '$1==c && $3=="active"{f=1} END{exit !f}'; }
+for a in 1 2 3 4 5; do
+  ok=1
+  for c in joint_state_broadcaster left_arm_controller left_hand_controller; do
+    if ! is_active "$c"; then ok=0
+      if ros2 control list_controllers 2>/dev/null | strip | awk -v c="$c" '$1==c{f=1} END{exit !f}'; then
+        ros2 control set_controller_state "$c" inactive >/dev/null 2>&1; sleep 1
+        ros2 control set_controller_state "$c" active >/dev/null 2>&1
+      else
+        ros2 control load_controller --set-state active "$c" >/dev/null 2>&1
+      fi
+    fi
+  done
+  [ "$ok" = 1 ] && break; sleep 3
+done
+for c in joint_state_broadcaster left_arm_controller left_hand_controller; do
+  is_active "$c" || { echo "$TRIAL controller_abort:$c"; exit 2; }
+done
+timeout 400 ros2 run openarm_grasp_physics physics_picker --ros-args \
+  -p use_sim_time:=true -p trial_id:="$TRIAL" -p output_dir:="$OUT" \
+  -p use_detector_target:=true -p relative_correction:=true \
+  -p rel_offset_x:="$OFFX" -p rel_offset_y:="$OFFY" \
+  > "/tmp/picker_${TRIAL}.log" 2>&1
+echo "INSTABILITY=$(grep -c 'unstable\|QACC' "$LOG")"
+grep -E 'relative correction|trial .* ->' "/tmp/picker_${TRIAL}.log" | tail -3
+grep -m3 'blobs:' "$LOG" | tail -2
+rm -f "$MODEL/$SCENE"
