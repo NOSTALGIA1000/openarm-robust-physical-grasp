@@ -50,7 +50,8 @@ python3 -m pytest tests -q
 - **不存在「第二失效模式」**：符号翻转的离群（+25/−33/−79 mm）与主漂移**同源**——12 次诊断显示离群点落在同一条「blob 质心 v ↔ y 残差」单调曲线上，只是构型偏上或偏下。60 百分位减轻但未根治漂移（离群率约 10–15%）。
 - **提高分位（88%）反而更糟**：坏支占比 10–15% → 50%，幅度 −33 → −44 mm，成功 3/12，已回退。标定批 4 次跨度仅 4.7 mm 是假象——恰好全落双峰同一侧。**标定批不能兼作方案评估**，这是第七步教训的重演。
 - **视觉闭环第九步（上限重测）**：漂移修复后 **y 向上限 128 → 192 mm（3/3，残差仅 +7 mm）、x 向 80 → 96 mm（3/3）**。修复并非直接提高上限，而是把残差从 +28 压到 +8 mm、腾出约 20 mm 余量——**余量决定上限**。y=256 mm 残差 +21 mm 逼近容差，感知断崖落在 192–256 mm。
-- **x 向上界现由运动学决定**：x=128 mm 三次全 `planning_failure` 且相对修正未执行（hover 阶段即失败，目标 x=0.428 超可达范围）。x 向**感知**上限仍未知。
+- **视觉闭环第十步：hover 规划失败不可解，是硬性可达限制**。MoveIt 报 `Unable to sample any valid states for goal tree`——目标位姿无 IK 解，与路径搜索无关。曾假设姿态约束过严（三轴 0.01 rad），但 **0.57° 与 90° 的 IK 失败次数完全相同**，假设被否定。可达边界：x=96 mm（目标 0.396）3/3 成功，**x=112 mm（0.412）0/3**，左臂 x 极限约 0.40 m。
+- **因此 x 向感知上限在当前场景下永远测不到**：96 mm 处感知残差仅 −8~−11 mm、余量充足，却已逼近机械可达边界。**「x 向 96 mm」是运动学数字，不是感知数字**，凡以其论证感知能力处均应如此限定。
 - **ROI 方案有一条由标定偏置本身设定的适用上界**：ROI 中心由 TF 投影，而 TF 携带的正是待抵消的偏置。x=64 mm 偏 54 px（仍在半径 55 内，故 11/11）；y=128/192 mm 偏 108/163 px，窗口内 `n=0` 完全脱靶。**第八步「漂移根治」应限定为 |偏置| ≲ 65 mm**，超出后已加 fallback 退回全带最深分位。
 - **漂移已根治（ROI 方案，限小偏置）**：改用运动学投影点圈定半径 55 px 搜索窗口，把小臂排除在候选集外（而非靠深度筛）。评估 12 次：x 残差跨度 **1.5 mm**、y **10.1 mm**、**零离群**、11/11 成功（对比 60 百分位 37 mm/2 次离群、88 百分位 ±44 mm/6 次）。首版曾 4 次全败，暴露一处几何事实——**相机看到的手掌表面在夹爪坐标原点后上方约 76 mm**（+74 px），需标定偏移；该偏移**姿态相关**，只在固定 hover 腕姿下成立。
 - **但上限未能重新确立**：y=192 mm 处感知残差从 +28 降到 +7.7 mm，却出现 2/3 `planning_failure`（hover 阶段就失败，与感知无关的规划瓶颈）；崩坏模式（`optical rel` 符号翻转、20–80 mm）修复前后均出现，未解决。每格 3 次，不足以宣称上限提高。
@@ -65,18 +66,19 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[视觉闭环第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[视觉闭环第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
-1. **解决大偏置下的 hover `planning_failure`**——已成为 x 向硬瓶颈（x=128 mm 三次全失败），并在 y=128/256 mm 处与真实感知失效混淆，挡住进一步测量。
-2. 加密 y 向 192–256 mm 定断崖；解决规划问题后测 x 向真实感知上限。
-3. **解决大偏置下的 hover 规划失败**——与感知无关；它现在是 y=192 mm 处的主要限制。
-4. 上述两项解决后重测各方向上限（当前 80/128 mm 是在漂移未修时测得的）。
-5. 加密 y 向 128–192 mm 之间的采样，给出新阈值与置信区间。
-6. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
-7. 扫描预张开开度，验证开环容差是否随余隙线性提高。
-8. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
+1. **诊断 y 向偶发 `planning_failure`**（y=128、y=256 各一次）——与 x 向的硬限制不同，y 向 192 mm 是 3/3，未触及可达边界，故偶发失败另有原因。
+2. 若要测 x 向真实感知上限，需重新布置场景（物体移近基座或改用右臂），代价是先前 x 向数据失去可比性。
+3. 加密 y 向 192–256 mm 定断崖；解决规划问题后测 x 向真实感知上限。
+4. **解决大偏置下的 hover 规划失败**——与感知无关；它现在是 y=192 mm 处的主要限制。
+5. 上述两项解决后重测各方向上限（当前 80/128 mm 是在漂移未修时测得的）。
+6. 加密 y 向 128–192 mm 之间的采样，给出新阈值与置信区间。
+7. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
+8. 扫描预张开开度，验证开环容差是否随余隙线性提高。
+9. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
 
 ## 来源与许可
 

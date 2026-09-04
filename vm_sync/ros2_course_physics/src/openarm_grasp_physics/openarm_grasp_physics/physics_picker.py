@@ -67,6 +67,7 @@ class PhysicsPicker(Node):
         self.declare_parameter("rel_offset_x", 0.0)
         self.declare_parameter("rel_offset_y", 0.0)
         self.declare_parameter("rehover_after_correction", True)
+        self.declare_parameter("hover_yaw_tolerance", 0.01)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -85,6 +86,7 @@ class PhysicsPicker(Node):
             rel_offset_y=self.get_parameter("rel_offset_y").value,
             rehover_after_correction=self.get_parameter(
                 "rehover_after_correction").value,
+            hover_yaw_tolerance=self.get_parameter("hover_yaw_tolerance").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
@@ -297,7 +299,8 @@ class PhysicsPicker(Node):
 
     # ---------------- motion primitives ----------------
 
-    def move_to(self, x, y, z, quat, tolerance=0.01, velocity_scale=0.05, acceleration_scale=0.05):
+    def move_to(self, x, y, z, quat, tolerance=0.01, velocity_scale=0.05,
+                acceleration_scale=0.05, yaw_tolerance=None):
         goal = MoveGroup.Goal()
         goal.request.group_name = GROUP
         goal.request.num_planning_attempts = 10
@@ -333,7 +336,13 @@ class PhysicsPicker(Node):
         ) = quat
         orientation.absolute_x_axis_tolerance = 0.01
         orientation.absolute_y_axis_tolerance = 0.01
-        orientation.absolute_z_axis_tolerance = 0.01
+        # Rotation about the tool axis barely affects a parallel jaw: the jaws
+        # are symmetric and the object self-aligns under load (Stage 2). Keeping
+        # it pinned to 0.01 rad costs reachable states for no benefit, and at
+        # the workspace edge that is what makes IK return nothing at all.
+        # x/y stay tight -- the tool must still point down.
+        orientation.absolute_z_axis_tolerance = (
+            0.01 if yaw_tolerance is None else yaw_tolerance)
         orientation.weight = 1.0
         constraints.orientation_constraints.append(orientation)
 
@@ -482,7 +491,8 @@ class PhysicsPicker(Node):
         grasp_z = obj_z + self.config.jaw_offset_z
 
         self.set_stage("hover")
-        if not self.move_to(x, y, hover_z, quat, tolerance=0.005):
+        if not self.move_to(x, y, hover_z, quat, tolerance=0.005,
+                            yaw_tolerance=self.config.hover_yaw_tolerance):
             planning_ok = False
             return self._finish(planning_ok, gripper_ok, timed_out)
 

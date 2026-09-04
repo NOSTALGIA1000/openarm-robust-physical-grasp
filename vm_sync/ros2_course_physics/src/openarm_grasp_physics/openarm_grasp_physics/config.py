@@ -95,6 +95,11 @@ class GraspConfig:
     # move happens at a safe height instead of as a diagonal sweep past the
     # object with the jaws open.
     rehover_after_correction: bool = True
+    # Yaw freedom allowed when planning the hover pose. Default keeps
+    # the historical 0.01 rad; larger values trade tool-axis rotation,
+    # which a symmetric parallel jaw does not care about, for reachable
+    # IK solutions near the workspace edge.
+    hover_yaw_tolerance: float = 0.01
 
     # --- Stage 2: hand-eye calibration error and pre-grasp visual correction ---
     # A miscalibrated camera-to-base transform biases every observation of the
