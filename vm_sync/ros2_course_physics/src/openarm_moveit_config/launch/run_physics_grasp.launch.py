@@ -105,8 +105,15 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Unlatching lets the detector keep re-measuring, which pre-grasp
+    # re-detection needs. Default stays latched: that is the course demo's
+    # behaviour and every earlier experiment ran with it.
+    detector_unlatched = os.environ.get("DETECTOR_UNLATCHED", "0") == "1"
     node_detector = ExecuteProcess(
-        cmd=["python3", detector_script, "--ros-args", "-p", "use_sim_time:=true"],
+        cmd=["python3", detector_script, "--ros-args",
+             "-p", "use_sim_time:=true",
+             "-p", "lock_first_detection:={}".format(
+                 "false" if detector_unlatched else "true")],
         output="screen",
     )
 

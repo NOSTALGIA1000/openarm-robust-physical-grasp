@@ -62,6 +62,7 @@ class PhysicsPicker(Node):
         self.declare_parameter("visual_correction", False)
         self.declare_parameter("use_detector_target", False)
         self.declare_parameter("detector_z_bias", 0.0275)
+        self.declare_parameter("pregrasp_redetect", False)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -74,6 +75,7 @@ class PhysicsPicker(Node):
             visual_correction=self.get_parameter("visual_correction").value,
             use_detector_target=self.get_parameter("use_detector_target").value,
             detector_z_bias=self.get_parameter("detector_z_bias").value,
+            pregrasp_redetect=self.get_parameter("pregrasp_redetect").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
@@ -95,6 +97,8 @@ class PhysicsPicker(Node):
         self._hold_bilateral = 0
 
         self._target = None
+        self._target_latest = None
+        self._target_seq = 0
         self.create_subscription(Point, "/apple_location", self._on_target, 10)
         self.create_subscription(
             GraspRawState, "/grasp_raw_state", self._on_telemetry, 50
@@ -112,6 +116,24 @@ class PhysicsPicker(Node):
         with self._lock:
             if self._target is None:
                 self._target = (msg.x, msg.y, msg.z)
+            # The first fix stays pinned above so the open-loop target cannot
+            # drift mid-trial. Pre-grasp re-detection reads the latest fix
+            # instead, and uses the sequence counter to distinguish a genuinely
+            # fresh observation from a stale one.
+            self._target_latest = (msg.x, msg.y, msg.z)
+            self._target_seq += 1
+
+    def _wait_fresh_target(self, timeout_s):
+        """Block until the detector publishes a new fix. None on timeout."""
+        with self._lock:
+            seq0 = self._target_seq
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            with self._lock:
+                if self._target_seq > seq0:
+                    return self._target_latest
+            time.sleep(0.05)
+        return None
 
     def _on_telemetry(self, msg):
         summary = summarize_contacts(
@@ -354,6 +376,10 @@ class PhysicsPicker(Node):
             true_x = self._latest.object_pose.position.x
             true_y = self._latest.object_pose.position.y
             true_z = self._latest.object_pose.position.z
+        # true_x/true_y are rebound further down to mean "target before the
+        # synthetic Stage 2 bias", so keep the simulator's actual object pose
+        # under names that are never shadowed.
+        gt_x, gt_y = true_x, true_y
 
         if self.config.use_detector_target:
             if not detector_seen:
@@ -410,6 +436,32 @@ class PhysicsPicker(Node):
         if not self.move_to(x, y, hover_z, quat, tolerance=0.005):
             planning_ok = False
             return self._finish(planning_ok, gripper_ok, timed_out)
+
+        if self.config.pregrasp_redetect:
+            # Genuine second observation from the hover pose, as opposed to the
+            # idealised cancellation below. Note what this can and cannot do:
+            # the object is re-observed through the SAME miscalibrated
+            # extrinsic, so a hand-eye translation error reappears identically.
+            # Only a measurement that also sees the gripper optically cancels
+            # common-mode bias.
+            fresh = self._wait_fresh_target(self.config.redetect_timeout_s)
+            if fresh is None:
+                self.get_logger().error(
+                    "pregrasp_redetect is set but no fresh observation arrived "
+                    "within {:.1f}s; is the detector latched? (needs "
+                    "lock_first_detection:=false)".format(
+                        self.config.redetect_timeout_s))
+                return self._finish(planning_ok, gripper_ok, True)
+            rx, ry, _rz = fresh
+            new_x = rx - self.config.jaw_offset_x
+            new_y = ry - self.config.jaw_offset_y
+            self.get_logger().info(
+                "pre-grasp re-detection -> x={:.4f} y={:.4f} (was x={:.4f} "
+                "y={:.4f}, moved x{:+.4f} y{:+.4f}); ground truth x={:.4f} "
+                "y={:.4f}, so residual error is x{:+.4f} y{:+.4f}".format(
+                    new_x, new_y, x, y, new_x - x, new_y - y,
+                    gt_x, gt_y, new_x - gt_x, new_y - gt_y))
+            x, y = new_x, new_y
 
         if self.config.visual_correction:
             # Re-measure relative to the gripper from the hover pose. A relative

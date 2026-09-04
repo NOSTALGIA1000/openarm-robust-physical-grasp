@@ -42,17 +42,19 @@ python3 -m pytest tests -q
 - **探测器真实精度已测**：横向 2.1 mm（不是瓶颈），深度 +27.5 mm 恒定几何偏置（探测器测物体顶面而非中心，非噪声，可标定扣除）。发现探测器**永久锁定首次读数**，此前 Stage 2 的"抓取前视觉修正"建模的重新测量机制实际并不存在，已订正并加 `lock_first_detection` 开关解锁。
 - **视觉闭环第一步（接入）已验证**：探测器输出接入抓取目标（扣除已测偏置）3/3 干净复现成功，指标与真值驱动持平。副产品：定位并避开一个仪器复用伪影——复用实例时手臂停留在上次 retreat 位置会挡住探测器视野。
 - **视觉闭环第二步（真实感知重测容差）已完成**：标定偏置改为注入相机→世界外参，探测器真实误差随之进入回路。19 次试验，断崖仍在 **24–32 mm**，与合成高斯模型的曲线一致——**Stage 2 的容差结论经真实感知链路验证成立**。附带暴露一个度量陷阱：单指蹭起物体可产生 28 mm 抬升却零双侧接触，只看抬升会把 0/4 误判成 2/4。
+- **视觉闭环第三步（抓取前重新探测）结论为阴性且强**：闭环不优于开环，0 mm 处反而把稳定成功工况打坏（1/2 vs 2/2）。原理上，用同一个错误外参重测同一个物体只会得到同一个错误坐标；实测上更糟——hover 位姿的夹爪落在探测器深度窗口内，与物体连成一片把轮廓质心拉偏，**残差被放大 2–3 倍，构成发散回路**。真闭环需要相机**光学地看到夹爪**（本探测器不能），故当前感知能力下开环即最优。
 
 抬升成立需三条同时满足：位置指令速度一致（`qvel`）、手臂关节具备转子惯量（`armature`）、执行器级力控（`position_pid` + 力矩钳位）。
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[视觉闭环第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [视觉闭环第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[视觉闭环第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
-1. **用已解锁的探测器实现真正的抓取前重新探测**，做开环 vs 闭环对照，区别于 Stage 2 理想化的相对测量上界（进行中）。
-2. 位姿随机化下重测真实感知容差（当前真实探测器曲线为固定初始位姿）。
+1. **让相机光学地看到夹爪**（标记点或手臂分割），做真正的相对测量——这是唯一能让视觉反馈超过开环的路（第三步已证明朴素重测不行）。
+2. 在深度图里按正运动学遮蔽手臂，先把闭环从"有害"拉回"与开环持平"。
+3. 位姿随机化下重测真实感知容差（当前真实探测器曲线为固定初始位姿）。
 3. 加密断崖附近采样（24/26/28/30 mm，每格 10 次以上），给出阈值与置信区间。
 4. 扫描预张开开度，验证容差是否随余隙线性提高。
 5. 双臂交接（规范要求单臂通过后方可开始，现已满足）。

@@ -70,6 +70,14 @@ class GraspConfig:
     use_detector_target: bool = False
     detector_z_bias: float = 0.0275
 
+    # Re-measure the object from the hover pose and re-target before descending.
+    # Requires the detector to run with lock_first_detection:=false. This is the
+    # naive form of closed-loop correction: re-observing the object alone
+    # through the *same* miscalibrated extrinsic returns the same biased answer,
+    # so it cannot correct hand-eye error. See the step 3 result document.
+    pregrasp_redetect: bool = False
+    redetect_timeout_s: float = 5.0
+
     # --- Stage 2: hand-eye calibration error and pre-grasp visual correction ---
     # A miscalibrated camera-to-base transform biases every observation of the
     # object by the same constant vector, so an open-loop grasp inherits it in
