@@ -46,7 +46,9 @@ python3 -m pytest tests -q
 - **视觉闭环第四步（光学相对测量）成功**：让相机同时看到夹爪与物体，两者都经过同一个错误外参，作差时**共模偏置被抵消**。32 mm 偏置的残差压到个位数毫米且不随偏置增长；容差从开环的 24–32 mm 提高到 **128–192 mm（约 4–6 倍）**。新的限制因素不再是标定误差本身；曾假设为离轴透视误差，**该假设已被实验否定**（透视与深度语义两项均已排除），机制待定。
 - **视觉闭环第五步（x 向与二维联合）**：相对修正对两轴都有效——x=48 mm 从开环 **0/2 变为 2/2**；二维联合 (32,32) 与 (48,48) 两轴同时越过各自断崖仍 **4/4 全成功**，在该量级上二维不构成新的失效模式（曾据串扰怀疑更大偏置下存在轴间耦合，该怀疑已被第七步推翻）。**增益各向异性：y 向约 4 倍，x 向约 2.5 倍（80 mm 可用，88 mm 起 1/2）。**
 - **视觉反馈改变了瓶颈所在的轴**：开环最严方向是 y（24–32 mm），相对修正后最严方向变成 x（80 mm）。第四步「提高 4–6 倍」只对 y 向成立。
-- **~~存在轴间串扰~~ → 实为间歇性 blob 误选**：先前基于 2 次一致读数（x=64 mm 处 y 残差 −19 mm）断言存在轴间串扰。复现检验推翻了它——同一条件 10 次呈**双峰分布**（3 次 ≈−19 mm，7 次 ≈0），同一脚本既得 −0.3 mm 也得 −18.8 mm。**不是 x 的函数**，而是夹爪 blob 选取偶发误选一个偏移约 19 mm 的目标。该量级与 192 mm 处的 16.7 mm 跳变、像素数抖动（3318 vs 2576）一致，很可能同源。
+- **视觉闭环第八步（blob 漂移定位与部分修复）**：加诊断日志直接观测后，第七步「误选 blob」的推测也不完全对——blob 特征始终一致（`area≈3200`、`n_blobs=1`），**是同一个 blob 在图像中上下漂移**（质心 v 从 207 到 255，与 y 残差单调对应）。根因：深度带厚 116 mm，把手连同一段小臂一起圈入，而 MoveIt 每次的手臂构型不同。改取**最深分位**（贴近钳口平面）并重标偏移后，残差跨度 **44.8 → 11.2 mm**、x 向 **2.7 mm**，8/8 成功。
+- **但上限未能重新确立**：y=192 mm 处感知残差从 +28 降到 +7.7 mm，却出现 2/3 `planning_failure`（hover 阶段就失败，与感知无关的规划瓶颈）；崩坏模式（`optical rel` 符号翻转、20–80 mm）修复前后均出现，未解决。每格 3 次，不足以宣称上限提高。
+- **~~存在轴间串扰~~ → 实为同一 blob 漂移**：先前基于 2 次一致读数（x=64 mm 处 y 残差 −19 mm）断言存在轴间串扰。复现检验推翻了它——同一条件 10 次呈**双峰分布**（3 次 ≈−19 mm，7 次 ≈0），同一脚本既得 −0.3 mm 也得 −18.8 mm。**不是 x 的函数**，而是夹爪 blob 选取偶发误选一个偏移约 19 mm 的目标。该量级与 192 mm 处的 16.7 mm 跳变、像素数抖动（3318 vs 2576）一致，很可能同源。
 - **一处方法学失误**：x 向初版只取 48 与 96 mm 两点，把上限低估约一半（实为 80–96 mm）。断崖两侧各取一点会把「未测」误读成「已测得的上限」。
 - **视觉闭环第七步（随机位姿下的 x 向与二维）**：x=64 mm 随机位姿 **6/6**、(48,48) 随机位姿 **4/4 有效**（另 2 次基础设施失败单列）。至此 y 单轴、x 单轴、二维三种偏置形态**都已在随机位姿下验证**。
 - **视觉闭环第六步（位姿随机化）12/12**：12 组随机位姿（位移 ±6 mm、偏航 0–±45°）叠加 y=64 mm 标定偏置，**全部成功**，含两次 ±45°。残差与固定位姿下同量级（x 均值 −6.9 mm、y 均值 +4.2 mm），说明**位姿变化几乎不影响相对测量精度**。补上了第四、五步「全部试验用同一初始位姿」的最后一处泛化缺口。
@@ -57,11 +59,13 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[视觉闭环第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[视觉闭环第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
-1. **直接观测夹爪 blob 误选**——记录被选中 blob 的像素范围、面积与夹爪姿态。第七步已证实存在约 19 mm 的双稳态误选，且很可能同时解释 192 mm 抖动、x=96 mm 不一致与像素数跳变。修掉后需重测各方向上限（当前上限可能被误选拉低）。
+1. **查清第二失效模式**——`optical rel` 符号翻转、量级 20–80 mm，修复前后均偶发（`bd06`/`dp06`/`lim_x096_3`），是当前残差分布中唯一的离群源。
+2. **解决大偏置下的 hover 规划失败**——与感知无关；它现在是 y=192 mm 处的主要限制。
+3. 上述两项解决后重测各方向上限（当前 80/128 mm 是在漂移未修时测得的）。
 2. 加密 y 向 128–192 mm 之间的采样，给出新阈值与置信区间。
 3. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
 4. 扫描预张开开度，验证开环容差是否随余隙线性提高。

@@ -512,6 +512,9 @@ class PhysicsPicker(Node):
             new_x = gx + rel_x - self.config.rel_offset_x - self.config.jaw_offset_x
             new_y = gy + rel_y - self.config.rel_offset_y - self.config.jaw_offset_y
             self.get_logger().info(
+                "raw cam readings: obj=({:.4f},{:.4f},{:.4f}) grip=({:.4f},{:.4f},{:.4f})"
+                .format(*obj_cam, *grip_cam))
+            self.get_logger().info(
                 "relative correction -> x={:.4f} y={:.4f} (was x={:.4f} y={:.4f}); "
                 "gripper_kin x={:.4f} y={:.4f}, optical rel x{:+.4f} y{:+.4f}; "
                 "ground truth x={:.4f} y={:.4f}, so residual error is "

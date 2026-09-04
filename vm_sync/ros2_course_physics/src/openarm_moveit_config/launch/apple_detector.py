@@ -49,11 +49,13 @@ class UniversalDetector(Node):
         self.declare_parameter('gripper_band_below', 0.09)
         self.declare_parameter('gripper_band_above', 0.03)
         self.declare_parameter('gripper_min_area', 15)
+        self.declare_parameter('gripper_deep_pct', 60.0)
         self.publish_cam = self.get_parameter('publish_camera_frame').value
         self.depth_split = self.get_parameter('depth_split').value
         self.gripper_band_below = self.get_parameter('gripper_band_below').value
         self.gripper_band_above = self.get_parameter('gripper_band_above').value
         self.gripper_min_area = self.get_parameter('gripper_min_area').value
+        self.gripper_deep_pct = self.get_parameter('gripper_deep_pct').value
         self.obj_cam_pub = self.create_publisher(Point, '/apple_location_cam', 10)
         self.grip_cam_pub = self.create_publisher(Point, '/gripper_location_cam', 10)
         # Kinematics supplies the expected gripper height so the right blob can
@@ -111,6 +113,81 @@ class UniversalDetector(Node):
             y=float((v - self.cy) * d / self.fy),
             z=d,
         )
+
+    def _deep_centroid_cam(self, depth_img, lo, hi, min_area):
+        """3D centroid of the deepest part of the gripper blob.
+
+        The band has to be ~116mm thick to contain enough pixels, which also
+        pulls in a stretch of forearm. MoveIt returns a different arm
+        configuration each run, so how much forearm falls inside the band
+        varies and drags the blob centroid: measured, the blob shifts up to 49
+        px (~54mm) while the gripper itself moves 4mm.
+
+        Taking the deepest pixels keeps the surfaces nearest the jaw plane -
+        finger and palm underside - which is what the target actually needs.
+        Note this is the opposite end from the earlier top-slice attempt, which
+        selected the highest arm surfaces and so did not help.
+        """
+        mask = (((depth_img > lo) & (depth_img < hi)) * 255).astype(np.uint8)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return None
+        largest = max(contours, key=cv2.contourArea)
+        if cv2.contourArea(largest) < min_area:
+            return None
+        blob = np.zeros(depth_img.shape, np.uint8)
+        cv2.drawContours(blob, [largest], -1, 255, -1)
+        sel = (blob > 0) & (depth_img > lo) & (depth_img < hi)
+        if not sel.any():
+            return None
+        cut = float(np.percentile(depth_img[sel], self.gripper_deep_pct))
+        sel &= depth_img >= cut
+        if sel.sum() < 8:
+            return None
+        vs, us = np.nonzero(sel)
+        dd = depth_img[sel].astype(np.float64)
+        return Point(
+            x=float(np.mean((us - self.cx) * dd / self.fx)),
+            y=float(np.mean((vs - self.cy) * dd / self.fy)),
+            z=float(np.mean(dd)),
+        )
+
+    def _blob_diag(self, depth_img, lo, hi, min_area):
+        """Describe the blob that would be selected, to identify misselection.
+
+        The gripper reading is bistable: repeated trials at one bias give
+        either ~0 or ~19mm of offset with nothing in between, so the two modes
+        must correspond to two different blobs. Logging extent, area and depth
+        spread is what distinguishes them.
+        """
+        mask = (((depth_img > lo) & (depth_img < hi)) * 255).astype(np.uint8)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return "no contour"
+        ordered = sorted(contours, key=cv2.contourArea, reverse=True)
+        largest = ordered[0]
+        if cv2.contourArea(largest) < min_area:
+            return "largest area %.0f below floor %s" % (
+                cv2.contourArea(largest), min_area)
+        x, y, w, h = cv2.boundingRect(largest)
+        M = cv2.moments(largest)
+        cu = M["m10"] / M["m00"] if M["m00"] else -1
+        cv_ = M["m01"] / M["m00"] if M["m00"] else -1
+        blob = np.zeros(depth_img.shape, np.uint8)
+        cv2.drawContours(blob, [largest], -1, 255, -1)
+        dsel = depth_img[(blob > 0) & (depth_img > lo) & (depth_img < hi)]
+        dstat = ("d=%.3f/%.3f/%.3f" % (float(dsel.min()), float(np.median(dsel)),
+                                       float(dsel.max()))) if dsel.size else "d=none"
+        runner = ""
+        if len(ordered) > 1 and cv2.contourArea(ordered[1]) >= min_area:
+            rx, ry, rw, rh = cv2.boundingRect(ordered[1])
+            runner = " | 2nd area=%.0f bbox=%d,%d,%dx%d" % (
+                cv2.contourArea(ordered[1]), rx, ry, rw, rh)
+        return ("area=%.0f bbox=%d,%d,%dx%d centroid=%.1f,%.1f %s n_blobs=%d%s"
+                % (cv2.contourArea(largest), x, y, w, h, cu, cv_, dstat,
+                   len(ordered), runner))
 
     def _on_hint(self, msg):
         self.gripper_z_hint = float(msg.data)
@@ -172,13 +249,15 @@ class UniversalDetector(Node):
         lo = max(0.30, expected - self.gripper_band_below)
         hi = min(self.depth_split, expected + self.gripper_band_above)
         npix = int(((cv_image > lo) & (cv_image < hi)).sum())
-        grip = self._blob_centroid_cam(
-            cv_image, lo, hi, min_area=self.gripper_min_area)
+        grip = self._deep_centroid_cam(
+            cv_image, lo, hi, self.gripper_min_area)
         self.get_logger().info(
             "gripper band hint_z=%.3f expected_depth=%.3f band=%.3f..%.3f "
-            "pixels=%d -> %s" % (self.gripper_z_hint, expected, lo, hi, npix,
-                                 "published" if grip else "NO BLOB"),
-            throttle_duration_sec=1.0)
+            "pixels=%d out=%s | %s"
+            % (self.gripper_z_hint, expected, lo, hi, npix,
+               ("%.4f,%.4f,%.4f" % (grip.x, grip.y, grip.z)) if grip else "NONE",
+               self._blob_diag(cv_image, lo, hi, self.gripper_min_area)),
+            throttle_duration_sec=0.4)
         if grip is not None:
             self.grip_cam_pub.publish(grip)
 
