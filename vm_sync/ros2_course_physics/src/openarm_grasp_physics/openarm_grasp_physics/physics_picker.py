@@ -503,6 +503,13 @@ class PhysicsPicker(Node):
             with self._lock:
                 gx = self._latest.gripper_pose.position.x
                 gy = self._latest.gripper_pose.position.y
+                gz = self._latest.gripper_pose.position.z
+                gq = self._latest.gripper_pose.orientation
+            # Gripper orientation, to test whether the outlier readings coincide
+            # with an unusual arm configuration.
+            self.get_logger().info(
+                "gripper pose z={:.4f} quat=({:.4f},{:.4f},{:.4f},{:.4f})"
+                .format(gz, gq.x, gq.y, gq.z, gq.w))
 
             # camera_optical -> world is a 180 deg rotation about x, i.e.
             # diag(1, -1, -1); world -> camera_base_link carries no rotation.
