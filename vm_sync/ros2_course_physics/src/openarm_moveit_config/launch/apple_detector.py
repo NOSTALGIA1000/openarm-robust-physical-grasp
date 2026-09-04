@@ -51,8 +51,9 @@ class UniversalDetector(Node):
         self.declare_parameter('gripper_min_area', 15)
         self.declare_parameter('gripper_deep_pct', 60.0)
         self.declare_parameter('gripper_roi_px', 55)
-        self.declare_parameter('roi_offset_u', 74.0)
-        self.declare_parameter('roi_offset_v', -15.0)
+        self.declare_parameter('roi_offset_world_x', 0.076)
+        self.declare_parameter('roi_offset_world_y', 0.0)
+        self.declare_parameter('roi_offset_world_z', 0.0)
         self.publish_cam = self.get_parameter('publish_camera_frame').value
         self.depth_split = self.get_parameter('depth_split').value
         self.gripper_band_below = self.get_parameter('gripper_band_below').value
@@ -60,8 +61,10 @@ class UniversalDetector(Node):
         self.gripper_min_area = self.get_parameter('gripper_min_area').value
         self.gripper_deep_pct = self.get_parameter('gripper_deep_pct').value
         self.gripper_roi_px = self.get_parameter('gripper_roi_px').value
-        self.roi_offset_u = self.get_parameter('roi_offset_u').value
-        self.roi_offset_v = self.get_parameter('roi_offset_v').value
+        self.roi_offset_world = (
+            self.get_parameter('roi_offset_world_x').value,
+            self.get_parameter('roi_offset_world_y').value,
+            self.get_parameter('roi_offset_world_z').value)
         self.obj_cam_pub = self.create_publisher(Point, '/apple_location_cam', 10)
         self.grip_cam_pub = self.create_publisher(Point, '/gripper_location_cam', 10)
         # Kinematics supplies the expected gripper height so the right blob can
@@ -182,7 +185,16 @@ class UniversalDetector(Node):
         pt = PointStamped()
         pt.header.frame_id = 'world'
         pt.header.stamp = rclpy.time.Time().to_msg()
-        pt.point.x, pt.point.y, pt.point.z = self.gripper_point_hint
+        # Offset in WORLD metres, not pixels. What the camera sees is the
+        # palm/wrist surface, ~76mm behind the gripper frame origin toward the
+        # base. Expressing that as a fixed pixel shift only works at the
+        # gripper position it was measured at: the same 3D displacement
+        # projects to a different pixel count elsewhere in the view, which is
+        # why a pixel offset calibrated at x=64mm missed the hand entirely at
+        # y=128/192mm. Offsetting before projection tracks the gripper.
+        ox, oy, oz = self.roi_offset_world
+        gx, gy, gz = self.gripper_point_hint
+        pt.point.x, pt.point.y, pt.point.z = gx + ox, gy + oy, gz + oz
         try:
             tf = self.tf_buffer.lookup_transform(
                 'camera_optical_frame', 'world', rclpy.time.Time(),
@@ -192,14 +204,8 @@ class UniversalDetector(Node):
             return None
         if cam.z <= 0.05:
             return None
-        # The gripper frame's origin is not what the camera sees: the visible
-        # palm/wrist surface sits ~76mm behind it toward the base, a measured
-        # +74px, -15px in image space. Without this the ROI lands beside the
-        # hand and catches 6-11 pixels instead of the hundreds it needs.
-        # Valid because the hover orientation is fixed (quat 0,1,0,0); a
-        # different wrist attitude would need this re-measured.
-        return (self.cx + cam.x * self.fx / cam.z + self.roi_offset_u,
-                self.cy + cam.y * self.fy / cam.z + self.roi_offset_v)
+        return (self.cx + cam.x * self.fx / cam.z,
+                self.cy + cam.y * self.fy / cam.z)
 
     def _roi_centroid_cam(self, depth_img, lo, hi, centre):
         """Deepest-percentile 3D centroid inside a ROI around `centre`."""
@@ -324,12 +330,22 @@ class UniversalDetector(Node):
         lo = max(0.30, expected - self.gripper_band_below)
         hi = min(self.depth_split, expected + self.gripper_band_above)
         npix = int(((cv_image > lo) & (cv_image < hi)).sum())
+        # The ROI centre comes from TF, which carries the very hand-eye bias
+        # this measurement exists to cancel, so the window drifts off the hand
+        # as the bias grows: measured, x=64mm displaces it ~54px (inside the
+        # 55px radius, so it still works) while y=128/192mm displaces it
+        # 108/163px and the window catches nothing at all. A kinematic ROI is
+        # therefore only usable while the bias stays under roughly the radius.
+        # Beyond that, fall back to the whole-band deep percentile, which is
+        # noisier but has no such dependence.
         centre = self._project_hint()
-        if centre is None:
-            grip, nroi = self._deep_centroid_cam(
-                cv_image, lo, hi, self.gripper_min_area), -1
-        else:
+        grip, nroi = None, -1
+        if centre is not None:
             grip, nroi = self._roi_centroid_cam(cv_image, lo, hi, centre)
+        if grip is None:
+            grip = self._deep_centroid_cam(
+                cv_image, lo, hi, self.gripper_min_area)
+            nroi = -abs(nroi) if nroi > 0 else -1
         self.get_logger().info(
             "gripper band hint_z=%.3f expected_depth=%.3f band=%.3f..%.3f "
             "pixels=%d out=%s | %s"

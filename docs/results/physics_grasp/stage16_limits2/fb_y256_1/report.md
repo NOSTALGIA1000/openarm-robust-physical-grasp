@@ -1,0 +1,17 @@
+# Physics-mode grasp trial fb_y256_1
+
+- Result: `planning_failure`
+- Success: `False`
+- Samples: `1554`
+- Max elevation: `0.0008 m` (threshold `0.020 m`)
+- Hold bilateral ratio: `0.000` (threshold `0.80`)
+- Max relative drift: `0.0000 m` (threshold `0.010 m`)
+
+## Stage times (simulation seconds)
+
+- `settle`: `9.400`
+- `hover`: `11.000`
+- `open`: `31.380`
+- `descend`: `32.680`
+
+No software attachment and no object pose command exist in this mode; object motion is produced only by contact.
