@@ -75,6 +75,7 @@ class PhysicsPicker(Node):
         self.declare_parameter("branch_centre", -0.083)
         self.declare_parameter("branch_tolerance", 0.08)
         self.declare_parameter("settle_before_measure_s", 0.0)
+        self.declare_parameter("measure_samples", 1)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -100,6 +101,7 @@ class PhysicsPicker(Node):
             branch_tolerance=self.get_parameter("branch_tolerance").value,
             settle_before_measure_s=self.get_parameter(
                 "settle_before_measure_s").value,
+            measure_samples=self.get_parameter("measure_samples").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
@@ -183,14 +185,17 @@ class PhysicsPicker(Node):
             self._cam_seq += 1
 
     def _wait_relative_pair(self, timeout_s, samples=6):
-        """Collect several gripper readings and keep the deepest one.
+        """Collect `samples` gripper readings and keep the deepest one.
 
         Readings fall into two groups: one at the expected gripper depth, which
         yields a 1.6mm residual spread, and a shallower one carrying ~40% more
-        pixels because forearm has entered the band, worth -15..-17mm. The good
-        group is always the deeper of the two, so taking the maximum depth
-        selects it without a hard threshold - a threshold tight enough to
-        exclude the bad group left half the trials with no reading at all.
+        pixels because forearm has entered the band, worth -15..-17mm. Taking
+        the maximum depth was meant to select the good group without a hard
+        threshold, since a threshold tight enough to exclude the bad group left
+        half the trials with no reading at all. It does not work: the split is
+        per trial, so all samples within one launch belong to the same group
+        and there is nothing to select between. Default `samples` is 1, which
+        takes the first fresh reading.
         """
         with self._lock:
             seq0 = self._cam_seq
@@ -592,13 +597,13 @@ class PhysicsPicker(Node):
             # yet gripper optics bimodal over 26.7mm.
             self.wait_sim(self.config.settle_before_measure_s)
 
-            # Three times the usual window, because picking the best of several
-            # readings needs several to exist: the detector runs multiple
-            # contour passes per frame and publishes far below the camera's
-            # 6fps, so a 5s window yielded only 2-4 samples and sometimes none
-            # from the good group.
-            obj_cam, grip_cam = self._wait_relative_pair(
-                self.config.redetect_timeout_s * 3.0, samples=8)
+            # Collecting several readings needs a longer window, because the
+            # detector runs multiple contour passes per frame and publishes far
+            # below the camera's 6fps: a 5s window yielded only 2-4 samples.
+            # A single sample keeps the historical window.
+            samples = max(1, int(self.config.measure_samples))
+            window = self.config.redetect_timeout_s * (3.0 if samples > 1 else 1.0)
+            obj_cam, grip_cam = self._wait_relative_pair(window, samples=samples)
             if obj_cam is None:
                 self.get_logger().error(
                     "relative_correction is set but no paired object/gripper "

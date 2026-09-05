@@ -78,6 +78,16 @@ class GraspConfig:
     pregrasp_redetect: bool = False
     redetect_timeout_s: float = 5.0
 
+    # How many gripper readings to collect before descending, keeping the
+    # deepest. One reproduces the single-reading behaviour every tolerance
+    # batch through stage19 was measured under, and is the default so that new
+    # batches stay comparable with them. Best-of-N was tried against the depth
+    # criterion and does not help: the good and bad readings split per trial,
+    # not per frame, so all N samples in a launch come from the same group
+    # (see the 2026-09-06 root-cause document). The knob remains so that
+    # experiment can be re-run.
+    measure_samples: int = 1
+
     # Relative (differential) visual correction. Measures object and gripper
     # optically in the camera frame and adds their difference to the gripper
     # pose known from kinematics:
