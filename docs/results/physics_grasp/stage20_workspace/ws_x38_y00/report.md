@@ -1,0 +1,19 @@
+# Physics-mode grasp trial ws_x38_y00
+
+- Result: `unilateral_contact`
+- Success: `False`
+- Samples: `2895`
+- Max elevation: `0.0007 m` (threshold `0.020 m`)
+- Hold bilateral ratio: `0.000` (threshold `0.80`)
+- Max relative drift: `0.0000 m` (threshold `0.010 m`)
+
+## Stage times (simulation seconds)
+
+- `settle`: `14.640`
+- `hover`: `16.000`
+- `open`: `33.040`
+- `descend`: `34.280`
+- `close`: `51.420`
+- `retreat`: `56.780`
+
+No software attachment and no object pose command exist in this mode; object motion is produced only by contact.
