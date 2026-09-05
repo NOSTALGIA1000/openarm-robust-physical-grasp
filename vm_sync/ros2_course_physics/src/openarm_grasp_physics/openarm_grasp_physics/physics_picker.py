@@ -24,12 +24,14 @@ from moveit_msgs.msg import (
     BoundingVolume,
     CollisionObject,
     Constraints,
+    JointConstraint,
     OrientationConstraint,
     PlanningScene,
     PositionConstraint,
 )
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Float64, Header
 
@@ -68,6 +70,11 @@ class PhysicsPicker(Node):
         self.declare_parameter("rel_offset_y", 0.0)
         self.declare_parameter("rehover_after_correction", True)
         self.declare_parameter("hover_yaw_tolerance", 0.01)
+        self.declare_parameter("lock_ik_branch", False)
+        self.declare_parameter("branch_joint", "openarm_left_joint5")
+        self.declare_parameter("branch_centre", -0.083)
+        self.declare_parameter("branch_tolerance", 0.08)
+        self.declare_parameter("settle_before_measure_s", 0.0)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -87,6 +94,12 @@ class PhysicsPicker(Node):
             rehover_after_correction=self.get_parameter(
                 "rehover_after_correction").value,
             hover_yaw_tolerance=self.get_parameter("hover_yaw_tolerance").value,
+            lock_ik_branch=self.get_parameter("lock_ik_branch").value,
+            branch_joint=self.get_parameter("branch_joint").value,
+            branch_centre=self.get_parameter("branch_centre").value,
+            branch_tolerance=self.get_parameter("branch_tolerance").value,
+            settle_before_measure_s=self.get_parameter(
+                "settle_before_measure_s").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
@@ -113,6 +126,7 @@ class PhysicsPicker(Node):
         self._obj_cam = None
         self._grip_cam = None
         self._cam_seq = 0
+        self._joints = None
         self.create_subscription(Point, "/apple_location", self._on_target, 10)
         self.create_subscription(Point, "/apple_location_cam", self._on_obj_cam, 10)
         self.create_subscription(
@@ -120,6 +134,11 @@ class PhysicsPicker(Node):
         self.create_subscription(
             GraspRawState, "/grasp_raw_state", self._on_telemetry, 50
         )
+        # Joint angles at the hover pose. The arm is 7-DoF against a 6-DoF task,
+        # so one redundant degree is free and MoveIt may resolve it differently
+        # each run. Every window strategy tried so far failed to remove the
+        # resulting drift, so the next question is which joint actually varies.
+        self.create_subscription(JointState, "/joint_states", self._on_joints, 10)
         self.scene_pub = self.create_publisher(PlanningScene, "/planning_scene", 10)
         # Expected gripper height, so the detector can tell the hand from the
         # rest of the arm in the depth image. Selection aid only; the detector's
@@ -149,6 +168,11 @@ class PhysicsPicker(Node):
             self._target_latest = (msg.x, msg.y, msg.z)
             self._target_seq += 1
 
+    def _on_joints(self, msg):
+        with self._lock:
+            self._joints = {n: p for n, p in zip(msg.name, msg.position)
+                            if n.startswith("openarm_left_joint")}
+
     def _on_obj_cam(self, msg):
         with self._lock:
             self._obj_cam = (msg.x, msg.y, msg.z)
@@ -158,20 +182,39 @@ class PhysicsPicker(Node):
             self._grip_cam = (msg.x, msg.y, msg.z)
             self._cam_seq += 1
 
-    def _wait_relative_pair(self, timeout_s):
-        """Wait for a gripper reading paired with an object reading.
+    def _wait_relative_pair(self, timeout_s, samples=6):
+        """Collect several gripper readings and keep the deepest one.
 
-        The gripper is only visible once the arm is at the hover pose, so this
-        gates on the gripper stream and takes the object reading alongside it.
+        Readings fall into two groups: one at the expected gripper depth, which
+        yields a 1.6mm residual spread, and a shallower one carrying ~40% more
+        pixels because forearm has entered the band, worth -15..-17mm. The good
+        group is always the deeper of the two, so taking the maximum depth
+        selects it without a hard threshold - a threshold tight enough to
+        exclude the bad group left half the trials with no reading at all.
         """
         with self._lock:
             seq0 = self._cam_seq
         deadline = time.time() + timeout_s
+        best_grip, best_obj = None, None
+        seen = 0
         while time.time() < deadline:
             with self._lock:
-                if self._cam_seq > seq0 and self._obj_cam and self._grip_cam:
-                    return self._obj_cam, self._grip_cam
+                fresh = self._cam_seq > seq0 and self._obj_cam and self._grip_cam
+                grip = self._grip_cam
+                obj = self._obj_cam
+                seq_now = self._cam_seq
+            if fresh:
+                if best_grip is None or grip[2] > best_grip[2]:
+                    best_grip, best_obj = grip, obj
+                seen += 1
+                seq0 = seq_now
+                if seen >= samples:
+                    break
             time.sleep(0.05)
+        if best_grip is not None:
+            self.get_logger().info(
+                "paired reading: kept z=%.4f from %d samples" % (best_grip[2], seen))
+            return best_obj, best_grip
         return None, None
 
     def _wait_fresh_target(self, timeout_s):
@@ -300,7 +343,7 @@ class PhysicsPicker(Node):
     # ---------------- motion primitives ----------------
 
     def move_to(self, x, y, z, quat, tolerance=0.01, velocity_scale=0.05,
-                acceleration_scale=0.05, yaw_tolerance=None):
+                acceleration_scale=0.05, yaw_tolerance=None, lock_branch=False):
         goal = MoveGroup.Goal()
         goal.request.group_name = GROUP
         goal.request.num_planning_attempts = 10
@@ -345,6 +388,22 @@ class PhysicsPicker(Node):
             0.01 if yaw_tolerance is None else yaw_tolerance)
         orientation.weight = 1.0
         constraints.orientation_constraints.append(orientation)
+
+        if lock_branch and self.config.lock_ik_branch:
+            # The 7-DoF arm reaches one Cartesian pose through more than one
+            # joint solution, and MoveIt picks between them run to run.
+            # Measured at the hover pose: three trials agreed within 0.02 rad
+            # while a fourth jumped 5-13 deg across five joints, and the y
+            # residual flipped sign with it - the bimodality seen since step 7
+            # is those two branches. joint5 separates them most cleanly
+            # (-0.07..-0.095 against +0.153), so pinning it selects a branch.
+            jc = JointConstraint()
+            jc.joint_name = self.config.branch_joint
+            jc.position = self.config.branch_centre
+            jc.tolerance_above = self.config.branch_tolerance
+            jc.tolerance_below = self.config.branch_tolerance
+            jc.weight = 1.0
+            constraints.joint_constraints.append(jc)
 
         goal.request.goal_constraints.append(constraints)
 
@@ -505,7 +564,8 @@ class PhysicsPicker(Node):
 
         self.set_stage("hover")
         if not self.move_to(x, y, hover_z, quat, tolerance=0.005,
-                            yaw_tolerance=self.config.hover_yaw_tolerance):
+                            yaw_tolerance=self.config.hover_yaw_tolerance,
+                            lock_branch=True):
             planning_ok = False
             return self._finish(planning_ok, gripper_ok, timed_out)
 
@@ -523,8 +583,22 @@ class PhysicsPicker(Node):
                 self.point_hint_pub.publish(ph)
                 time.sleep(0.1)
 
+            # Let the arm come to rest before pairing the two measurements.
+            # Telemetry runs at 50Hz and the depth camera at 6Hz, so the
+            # kinematic read and the optical read can be up to 0.16s apart; any
+            # residual PID oscillation at the hover pose then puts the hand in
+            # two different places for the two reads. Measured symptom: object
+            # optics identical across trials, gripper kinematics within 3.7mm,
+            # yet gripper optics bimodal over 26.7mm.
+            self.wait_sim(self.config.settle_before_measure_s)
+
+            # Three times the usual window, because picking the best of several
+            # readings needs several to exist: the detector runs multiple
+            # contour passes per frame and publishes far below the camera's
+            # 6fps, so a 5s window yielded only 2-4 samples and sometimes none
+            # from the good group.
             obj_cam, grip_cam = self._wait_relative_pair(
-                self.config.redetect_timeout_s)
+                self.config.redetect_timeout_s * 3.0, samples=8)
             if obj_cam is None:
                 self.get_logger().error(
                     "relative_correction is set but no paired object/gripper "
@@ -554,6 +628,12 @@ class PhysicsPicker(Node):
             self.get_logger().info(
                 "raw cam readings: obj=({:.4f},{:.4f},{:.4f}) grip=({:.4f},{:.4f},{:.4f})"
                 .format(*obj_cam, *grip_cam))
+            with self._lock:
+                js = dict(self._joints) if self._joints else {}
+            if js:
+                self.get_logger().info(
+                    "hover joints: " + " ".join(
+                        "j%s=%+.4f" % (k[-1], js[k]) for k in sorted(js)))
             self.get_logger().info(
                 "relative correction -> x={:.4f} y={:.4f} (was x={:.4f} y={:.4f}); "
                 "gripper_kin x={:.4f} y={:.4f}, optical rel x{:+.4f} y{:+.4f}; "

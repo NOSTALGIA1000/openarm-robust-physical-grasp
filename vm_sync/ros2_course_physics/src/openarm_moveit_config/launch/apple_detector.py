@@ -46,7 +46,12 @@ class UniversalDetector(Node):
         # split is done on depth, not on contours.
         self.declare_parameter('publish_camera_frame', False)
         self.declare_parameter('depth_split', 0.71)
-        self.declare_parameter('gripper_band_below', 0.09)
+        # 0.09 puts the band's lower edge at 0.594, which overlaps the
+        # forearm: the depth histogram shows forearm filling 0.40-0.60
+        # continuously. 0.06 lifts the edge to 0.624 and excludes it.
+        # Symptom that led here: gripper optics bimodal over 20mm in y
+        # only, while x and z stayed within 4.4mm and 1.4mm.
+        self.declare_parameter('gripper_band_below', 0.06)
         self.declare_parameter('gripper_band_above', 0.03)
         self.declare_parameter('gripper_min_area', 15)
         self.declare_parameter('gripper_deep_pct', 60.0)
@@ -62,6 +67,10 @@ class UniversalDetector(Node):
         self.declare_parameter('marker_min_px', 60)
         self.declare_parameter('marker_max_px', 1200)
         self.declare_parameter('marker_min_circularity', 0.72)
+        # Loose: a hard reject starved half the trials of any reading at all.
+        # Only obvious nonsense is dropped here; picking the best of
+        # several readings is left to the consumer.
+        self.declare_parameter('grip_depth_tol', 0.08)
         self.declare_parameter('roi_offset_world_x', 0.076)
         self.declare_parameter('roi_offset_world_y', 0.0)
         self.declare_parameter('roi_offset_world_z', 0.0)
@@ -81,6 +90,7 @@ class UniversalDetector(Node):
         self.marker_max_px = self.get_parameter('marker_max_px').value
         self.marker_min_circularity = self.get_parameter(
             'marker_min_circularity').value
+        self.grip_depth_tol = self.get_parameter('grip_depth_tol').value
         self.roi_offset_world = (
             self.get_parameter('roi_offset_world_x').value,
             self.get_parameter('roi_offset_world_y').value,
@@ -544,6 +554,18 @@ class UniversalDetector(Node):
                    ("%.0f,%.0f" % centre) if centre else "NONE", csrc, nroi))
                + self._blob_diag(cv_image, lo, hi, self.gripper_min_area)),
             throttle_duration_sec=0.4)
+        # Reject readings whose depth disagrees with the expected gripper
+        # depth. Measured: readings split cleanly into z~0.682, matching the
+        # expected 0.684 and giving a 2.3mm residual spread, and z~0.640, which
+        # carries 40% more pixels because forearm has crept into the band and
+        # costs -15..-17mm. Depth agreement separates the two without needing
+        # to know which pixels are which.
+        if grip is not None and abs(grip.z - expected) > self.grip_depth_tol:
+            self.get_logger().info(
+                "gripper reading rejected: z=%.4f vs expected %.4f (tol %.3f)"
+                % (grip.z, expected, self.grip_depth_tol),
+                throttle_duration_sec=1.0)
+            grip = None
         if grip is not None:
             self.grip_cam_pub.publish(grip)
 

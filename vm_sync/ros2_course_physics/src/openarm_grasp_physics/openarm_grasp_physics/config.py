@@ -100,6 +100,17 @@ class GraspConfig:
     # which a symmetric parallel jaw does not care about, for reachable
     # IK solutions near the workspace edge.
     hover_yaw_tolerance: float = 0.01
+    # Pin one joint at the hover pose to select a single IK branch.
+    # The residual bimodality tracked since step 7 turned out to be two
+    # joint solutions for the same Cartesian pose, joint5 sitting near
+    # -0.08 in one and +0.15 in the other.
+    lock_ik_branch: bool = False
+    branch_joint: str = "openarm_left_joint5"
+    branch_centre: float = -0.083
+    branch_tolerance: float = 0.08
+    # Simulation seconds to hold still before taking the paired
+    # kinematic and optical readings, so both see the same pose.
+    settle_before_measure_s: float = 0.0
 
     # --- Stage 2: hand-eye calibration error and pre-grasp visual correction ---
     # A miscalibrated camera-to-base transform biases every observation of the
