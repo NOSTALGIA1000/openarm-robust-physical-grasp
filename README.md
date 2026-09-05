@@ -49,6 +49,9 @@ python3 -m pytest tests -q
 - **视觉闭环第八步（blob 漂移定位与部分修复）**：加诊断日志直接观测后，第七步「误选 blob」的推测也不完全对——blob 特征始终一致（`area≈3200`、`n_blobs=1`），**是同一个 blob 在图像中上下漂移**（质心 v 从 207 到 255，与 y 残差单调对应）。根因：深度带厚 116 mm，把手连同一段小臂一起圈入，而 MoveIt 每次的手臂构型不同。改取**最深分位**（贴近钳口平面）并重标偏移后，残差跨度 **44.8 → 11.2 mm**、x 向 **2.7 mm**，8/8 成功。
 - **不存在「第二失效模式」**：符号翻转的离群（+25/−33/−79 mm）与主漂移**同源**——12 次诊断显示离群点落在同一条「blob 质心 v ↔ y 残差」单调曲线上，只是构型偏上或偏下。60 百分位减轻但未根治漂移（离群率约 10–15%）。
 - **提高分位（88%）反而更糟**：坏支占比 10–15% → 50%，幅度 −33 → −44 mm，成功 3/12，已回退。标定批 4 次跨度仅 4.7 mm 是假象——恰好全落双峰同一侧。**标定批不能兼作方案评估**，这是第七步教训的重演。
+- **工作空间覆盖（新）：可达区 = y ≥ 0 半平面**。此前 337 次试验中方块**始终在 (0.3, 0)**，变化的只是标定误差——「容差 256 mm」不等于「方块放 256 mm 外能抓」。实测网格：**y < 0 全部 hover 阶段 IK 无解**（左臂跨身体中线），**y ≥ 0 且 x ∈ [0.25, 0.38] 全部成功**。作者预判的 x 远端与视野瓶颈**均被推翻**。
+- **可达区内标定稳定，但残差随位置放大约 6 倍**：同样 64 mm 偏置，原点处残差 +2.2~+3.9 mm，移到 (0.25,0)/(0.35,+0.10) 后变 +11.9~+25.7 mm，已贴近容差下沿（5/6 成功，1 次 `excessive_slip`）。推测 `rel_offset` 标定常量有位置依赖，**未验证**。
+- **粗扫必须重测**：首轮 x=0.35 整行失败，重测 5 点**翻转 3 点**（RRTConnect 随机 + VM 负载）。单次失败不足以判不可达。
 - **视觉闭环第十一步（y 向断崖定位）：上限 256 mm，增益 8–10 倍**。加密 208/224/240/248 mm **全部 4/4**，256 mm 重测 **4/5 有效**，288 mm **0/4**（残差 +42 mm 超 y 容差，`unilateral_contact`），320 mm 退化为 `no_contact`。断崖落在 **256–288 mm**，残差在该档翻倍（+21.5 → +42.4），192–256 区间则平缓。
 - **第九步的两个数字都错了，错因不同**：「上限 192 mm」是**跳步取样**（只测 128/192/256，中间全是 4/4）——**本项目第二次犯同一错误**（第五步 x 向亦然）；「256 mm 仅 1/3」是 **n=3 小样本叠加分类错误**（其中的 `planning_failure` 很可能实为 `detector_timeout`，该修复在第九步之后才做），把 80% 成功的工况读成 33%。
 - **新观察：大偏置下 `detector_timeout` 频率上升**——27 次中 3 次，全部出现在 248 mm 及以上，小偏置批次从未见到。推测物体被推向视野边缘后探测器拿不到稳定读数，**未验证**。
@@ -70,16 +73,19 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[视觉闭环第十一步](docs/results/2026-09-05-openarm-vision-in-loop-step11-ycliff.md) · [第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[工作空间覆盖](docs/results/2026-09-05-openarm-workspace-coverage.md) · [视觉闭环第十一步](docs/results/2026-09-05-openarm-vision-in-loop-step11-ycliff.md) · [第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
-1. **等待 descend 偶发失败复现**——诊断日志已就位（`move_to` 现记录 MoveIt `error_code`），下次发生即可定性；主动复现需 30–50 次，性价比低。
-2. 若要测 x 向真实感知上限，需重新布置场景（物体移近基座或改用右臂），代价是先前 x 向数据失去可比性。
-3. 加密 256–288 mm（当前断崖宽 32 mm），并验证 `detector_timeout` 是否随偏置上升。
-4. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
-5. 扫描预张开开度，验证开环容差是否随余隙线性提高。
-6. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
+1. **验证 `rel_offset` 的位置依赖**——在可达区多点各自标定，看残差能否压回原点处的 3 mm 量级；这是当前限制实用性的首要因素。
+2. **测右臂覆盖 y < 0 区域**，验证双臂互补能否覆盖整个桌面。
+3. 加密可达区边界（y ∈ [−0.10, 0]、x ∈ [0.38, 0.40]），并用 descend 高度而非 hover 高度重定可达极限。
+4. **等待 descend 偶发失败复现**——诊断日志已就位（`move_to` 现记录 MoveIt `error_code`），下次发生即可定性；主动复现需 30–50 次，性价比低。
+5. 若要测 x 向真实感知上限，需重新布置场景（物体移近基座或改用右臂），代价是先前 x 向数据失去可比性。
+6. 加密 256–288 mm（当前断崖宽 32 mm），并验证 `detector_timeout` 是否随偏置上升。
+7. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
+8. 扫描预张开开度，验证开环容差是否随余隙线性提高。
+9. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
 
 ## 来源与许可
 
