@@ -44,11 +44,14 @@ python3 -m pytest tests -q
 - **视觉闭环第二步（真实感知重测容差）已完成**：标定偏置改为注入相机→世界外参，探测器真实误差随之进入回路。19 次试验，断崖仍在 **24–32 mm**，与合成高斯模型的曲线一致——**Stage 2 的容差结论经真实感知链路验证成立**。附带暴露一个度量陷阱：单指蹭起物体可产生 28 mm 抬升却零双侧接触，只看抬升会把 0/4 误判成 2/4。
 - **视觉闭环第三步（抓取前重新探测）结论为阴性且强**：闭环不优于开环，0 mm 处反而把稳定成功工况打坏（1/2 vs 2/2）。原理上，用同一个错误外参重测同一个物体只会得到同一个错误坐标；实测上更糟——hover 位姿的夹爪落在探测器深度窗口内，与物体连成一片把轮廓质心拉偏，**残差被放大 2–3 倍，构成发散回路**。真闭环需要相机**光学地看到夹爪**（本探测器不能），故当前感知能力下开环即最优。
 - **视觉闭环第四步（光学相对测量）成功**：让相机同时看到夹爪与物体，两者都经过同一个错误外参，作差时**共模偏置被抵消**。32 mm 偏置的残差压到个位数毫米且不随偏置增长；容差从开环的 24–32 mm 提高到 **128–192 mm（约 4–6 倍）**。新的限制因素不再是标定误差本身；曾假设为离轴透视误差，**该假设已被实验否定**（透视与深度语义两项均已排除），机制待定。
-- **视觉闭环第五步（x 向与二维联合）**：相对修正对两轴都有效——x=48 mm 从开环 **0/2 变为 2/2**；二维联合 (32,32) 与 (48,48) 两轴同时越过各自断崖仍 **4/4 全成功**，在该量级上二维不构成新的失效模式（曾据串扰怀疑更大偏置下存在轴间耦合，该怀疑已被第七步推翻）。**增益各向异性（数字已由第九步修订：y 向 ≥6 倍即 192 mm，x 向 ≥96 mm 且上界由运动学而非感知决定）。**
+- **视觉闭环第五步（x 向与二维联合）**：相对修正对两轴都有效——x=48 mm 从开环 **0/2 变为 2/2**；二维联合 (32,32) 与 (48,48) 两轴同时越过各自断崖仍 **4/4 全成功**，在该量级上二维不构成新的失效模式（曾据串扰怀疑更大偏置下存在轴间耦合，该怀疑已被第七步推翻）。**增益各向异性（数字已由第十一步修订：y 向 8–10 倍即 256 mm，x 向 ≥96 mm 且上界由运动学而非感知决定）。**
 - **视觉反馈改变了瓶颈所在的轴**：开环最严方向是 y（24–32 mm），相对修正后最严方向变成 x。但 x 的那个数字（96 mm）是**运动学**边界而非感知边界（第十步），故两轴已不可直接比较。第四步「提高 4–6 倍」只对 y 向成立。
 - **视觉闭环第八步（blob 漂移定位与部分修复）**：加诊断日志直接观测后，第七步「误选 blob」的推测也不完全对——blob 特征始终一致（`area≈3200`、`n_blobs=1`），**是同一个 blob 在图像中上下漂移**（质心 v 从 207 到 255，与 y 残差单调对应）。根因：深度带厚 116 mm，把手连同一段小臂一起圈入，而 MoveIt 每次的手臂构型不同。改取**最深分位**（贴近钳口平面）并重标偏移后，残差跨度 **44.8 → 11.2 mm**、x 向 **2.7 mm**，8/8 成功。
 - **不存在「第二失效模式」**：符号翻转的离群（+25/−33/−79 mm）与主漂移**同源**——12 次诊断显示离群点落在同一条「blob 质心 v ↔ y 残差」单调曲线上，只是构型偏上或偏下。60 百分位减轻但未根治漂移（离群率约 10–15%）。
 - **提高分位（88%）反而更糟**：坏支占比 10–15% → 50%，幅度 −33 → −44 mm，成功 3/12，已回退。标定批 4 次跨度仅 4.7 mm 是假象——恰好全落双峰同一侧。**标定批不能兼作方案评估**，这是第七步教训的重演。
+- **视觉闭环第十一步（y 向断崖定位）：上限 256 mm，增益 8–10 倍**。加密 208/224/240/248 mm **全部 4/4**，256 mm 重测 **4/5 有效**，288 mm **0/4**（残差 +42 mm 超 y 容差，`unilateral_contact`），320 mm 退化为 `no_contact`。断崖落在 **256–288 mm**，残差在该档翻倍（+21.5 → +42.4），192–256 区间则平缓。
+- **第九步的两个数字都错了，错因不同**：「上限 192 mm」是**跳步取样**（只测 128/192/256，中间全是 4/4）——**本项目第二次犯同一错误**（第五步 x 向亦然）；「256 mm 仅 1/3」是 **n=3 小样本叠加分类错误**（其中的 `planning_failure` 很可能实为 `detector_timeout`，该修复在第九步之后才做），把 80% 成功的工况读成 33%。
+- **新观察：大偏置下 `detector_timeout` 频率上升**——27 次中 3 次，全部出现在 248 mm 及以上，小偏置批次从未见到。推测物体被推向视野边缘后探测器拿不到稳定读数，**未验证**。
 - **视觉闭环第九步（上限重测）**：漂移修复后 **y 向上限 128 → 192 mm（3/3，残差仅 +7 mm）、x 向 80 → 96 mm（3/3）**。修复并非直接提高上限，而是把残差从 +28 压到 +8 mm、腾出约 20 mm 余量——**余量决定上限**。y=256 mm 残差 +21 mm 逼近容差，感知断崖落在 192–256 mm。
 - **视觉闭环第十步：hover 规划失败不可解，是硬性可达限制**。MoveIt 报 `Unable to sample any valid states for goal tree`——目标位姿无 IK 解，与路径搜索无关。曾假设姿态约束过严（三轴 0.01 rad），但 **0.57° 与 90° 的 IK 失败次数完全相同**，假设被否定。可达边界：x=96 mm（目标 0.396）3/3 成功，**x=112 mm（0.412）0/3**，左臂 x 极限约 0.40 m。
 - **descend 偶发失败：排除两项假设，未能复现**。查日志证实其规划与执行**都成功**（`Goal reached, success!`），故「容差 0.003 m 过严」不成立；末尾的 `exit code -9` 是下一次 preflight 的正常清理、出现在判定之后，「OOM」也不成立（内存余量 4.3 GB）。卡点在于 `move_to` 判的是 action `error_code`，而它从未被打印——已补上日志。同条件 10 次零复现，合并发生率约 **2/30 ≈ 6.7%**，10 次抓不到的概率约 50%，**未复现不等于问题消失**。
@@ -67,13 +70,13 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[视觉闭环第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[视觉闭环第十一步](docs/results/2026-09-05-openarm-vision-in-loop-step11-ycliff.md) · [第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
 1. **等待 descend 偶发失败复现**——诊断日志已就位（`move_to` 现记录 MoveIt `error_code`），下次发生即可定性；主动复现需 30–50 次，性价比低。
 2. 若要测 x 向真实感知上限，需重新布置场景（物体移近基座或改用右臂），代价是先前 x 向数据失去可比性。
-3. 加密 y 向 192–256 mm 定断崖——这是当前唯一能继续推进的感知数字（x 向已被运动学封顶）。
+3. 加密 256–288 mm（当前断崖宽 32 mm），并验证 `detector_timeout` 是否随偏置上升。
 4. 用标记点或手臂分割替代运动学提示来选取夹爪 blob，去掉对 FK 的依赖。
 5. 扫描预张开开度，验证开环容差是否随余隙线性提高。
 6. 双臂交接（规范要求单臂通过后方可开始，现已满足）。
