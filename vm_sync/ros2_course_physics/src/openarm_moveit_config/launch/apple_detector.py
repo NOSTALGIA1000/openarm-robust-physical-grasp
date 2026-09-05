@@ -51,6 +51,7 @@ class UniversalDetector(Node):
         self.declare_parameter('gripper_min_area', 15)
         self.declare_parameter('gripper_deep_pct', 60.0)
         self.declare_parameter('gripper_roi_px', 30)
+        self.declare_parameter('roi_cascade', [90, 55, 30])
         # Default off: with depth as the only channel the marker cannot be
         # separated from the forearm, which spans 0.40-0.60 continuously
         # while the marker sits at 0.53 inside that range. Needs an RGB
@@ -71,6 +72,8 @@ class UniversalDetector(Node):
         self.gripper_min_area = self.get_parameter('gripper_min_area').value
         self.gripper_deep_pct = self.get_parameter('gripper_deep_pct').value
         self.gripper_roi_px = self.get_parameter('gripper_roi_px').value
+        self.roi_cascade = list(
+            self.get_parameter('roi_cascade').value)
         self.use_marker_roi = self.get_parameter('use_marker_roi').value
         self.marker_depth_lo = self.get_parameter('marker_depth_lo').value
         self.marker_depth_hi = self.get_parameter('marker_depth_hi').value
@@ -250,6 +253,63 @@ class UniversalDetector(Node):
             y=float(np.mean((vs - self.cy) * dd / self.fy)),
             z=float(np.mean(dd)),
         ), n
+
+    def _roi_centroid_at(self, depth_img, lo, hi, centre, radius):
+        """Deep-percentile 3D centroid inside a window of the given radius."""
+        u0, v0 = centre
+        h, w = depth_img.shape
+        r = int(radius)
+        u1, u2 = max(0, int(u0) - r), min(w, int(u0) + r + 1)
+        v1, v2 = max(0, int(v0) - r), min(h, int(v0) + r + 1)
+        if u2 <= u1 or v2 <= v1:
+            return None, 0
+        roi = np.zeros(depth_img.shape, bool)
+        roi[v1:v2, u1:u2] = True
+        sel = roi & (depth_img > lo) & (depth_img < hi)
+        n = int(sel.sum())
+        if n < 40:
+            return None, n
+        cut = float(np.percentile(depth_img[sel], self.gripper_deep_pct))
+        sel &= depth_img >= cut
+        if sel.sum() < 8:
+            return None, n
+        vs, us = np.nonzero(sel)
+        dd = depth_img[sel].astype(np.float64)
+        return Point(
+            x=float(np.mean((us - self.cx) * dd / self.fx)),
+            y=float(np.mean((vs - self.cy) * dd / self.fy)),
+            z=float(np.mean(dd)),
+        ), n
+
+    def _cascade_centroid(self, depth_img, lo, hi, centre):
+        """Coarse-to-fine: shrink the window, re-centring on what was measured.
+
+        Resolves the conflict that a small window measures well (30px gave a
+        3.1mm residual spread against 30.6mm at 55px) but is pushed off the
+        hand by bias, since its centre comes from TF which carries that bias
+        (54px of displacement at 64mm).
+
+        Only the first pass uses the TF centre, and it is wide enough to
+        contain the hand despite that displacement. Each later pass re-centres
+        on the previous pass's own optical measurement, so the dependence on TF
+        decays as the window closes in.
+        """
+        c = centre
+        pt, n = None, -1
+        trace = []
+        for r in self.roi_cascade:
+            p, nn = self._roi_centroid_at(depth_img, lo, hi, c, r)
+            if p is None:
+                trace.append("r%d@(%.0f,%.0f) n=%d FAIL" % (r, c[0], c[1], nn))
+                break
+            pt, n = p, nn
+            if p.z > 0.05:
+                c = (self.cx + p.x * self.fx / p.z,
+                     self.cy + p.y * self.fy / p.z)
+            trace.append("r%d n=%d ->(%.0f,%.0f)" % (r, nn, c[0], c[1]))
+        self.get_logger().info("cascade: " + " | ".join(trace),
+                               throttle_duration_sec=1.0)
+        return pt, n
 
     def _find_marker(self, depth_img):
         """Locate the gripper marker in the image, without using TF.
@@ -467,7 +527,7 @@ class UniversalDetector(Node):
             csrc = "tf" if centre is not None else "none"
         grip, nroi = None, -1
         if centre is not None:
-            grip, nroi = self._roi_centroid_cam(cv_image, lo, hi, centre)
+            grip, nroi = self._cascade_centroid(cv_image, lo, hi, centre)
             self.get_logger().info(
                 self._feature_candidates(cv_image, lo, hi, centre),
                 throttle_duration_sec=0.4)
