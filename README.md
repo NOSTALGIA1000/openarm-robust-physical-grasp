@@ -50,6 +50,8 @@ python3 -m pytest tests -q
 - **不存在「第二失效模式」**：符号翻转的离群（+25/−33/−79 mm）与主漂移**同源**——12 次诊断显示离群点落在同一条「blob 质心 v ↔ y 残差」单调曲线上，只是构型偏上或偏下。60 百分位减轻但未根治漂移（离群率约 10–15%）。
 - **提高分位（88%）反而更糟**：坏支占比 10–15% → 50%，幅度 −33 → −44 mm，成功 3/12，已回退。标定批 4 次跨度仅 4.7 mm 是假象——恰好全落双峰同一侧。**标定批不能兼作方案评估**，这是第七步教训的重演。
 - **工作空间覆盖（新）：可达区 = y ≥ 0 半平面**。此前 337 次试验中方块**始终在 (0.3, 0)**，变化的只是标定误差——「容差 256 mm」不等于「方块放 256 mm 外能抓」。实测网格：**y < 0 全部 hover 阶段 IK 无解**（左臂跨身体中线），**y ≥ 0 且 x ∈ [0.25, 0.38] 全部成功**。作者预判的 x 远端与视野瓶颈**均被推翻**。
+- **夹爪测量漂移的病因已确认：搜索窗口过大，不是特征选错**。同 ROI 内并行比较四个候选特征（质心/bbox 中心/最深 10%/最深单点），y 跨度全在 **25–40 mm**，换特征无用。`vspan` 显示轮廓宽度稳定（76–82 px）而整片平移 23 px，且**运动学跨度仅 5.4 mm、光学却 35.2 mm** —— 手没动，是窗口混入了随构型变化的小臂。**ROI 55→30 px 后零偏置残差跨度 30.6 → 3.1 mm，约 10 倍改善**。
+- **但窗口缩小与抗偏置能力直接冲突**：64 mm 偏置下 ROI 全部脱靶（`n` 为负，退回 fallback），因 ROI 中心由带偏置的 TF 投影得到。**窗口越小越稳，也越早脱靶** —— 单一固定半径无解，需自适应半径或不依赖 TF 的手部定位。
 - **「位置依赖」推测已被否定**：零偏移标定五点后发现 x 残差各处一致（−12.5~−15.2 mm），而 y 残差在**同一位置**两次相差 **30.6 mm**——变异源是**手臂构型**，不是位置，故位置相关标定这条路走不通。ROI 虽全部命中（n=211~1246），但区域内像素数差 31%、测量差 30.8 mm：**ROI 限制搜索区域，却挡不住「可见表面质心随构型移动」**。第八步「漂移根治」须进一步限定为「固定物体位置 + 小偏置」。
 - **标定常量本身依赖标定条件**：零偏置下 `rel_offset_x ≈ −14.2 mm`，x=64 mm 偏置下标定为 −20.9 mm，差 6.7 mm（推测因 ROI 命中位置随偏置移动）。**「标定一次到处可用」不成立。**
 - **可达区内标定稳定，但残差随位置放大约 6 倍**：同样 64 mm 偏置，原点处残差 +2.2~+3.9 mm，移到 (0.25,0)/(0.35,+0.10) 后变 +11.9~+25.7 mm，已贴近容差下沿（5/6 成功，1 次 `excessive_slip`）。推测 `rel_offset` 标定常量有位置依赖，**未验证**。
@@ -75,11 +77,11 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[工作空间覆盖](docs/results/2026-09-05-openarm-workspace-coverage.md) · [视觉闭环第十一步](docs/results/2026-09-05-openarm-vision-in-loop-step11-ycliff.md) · [第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
+结论文档：[夹爪测量稳定性](docs/results/2026-09-05-openarm-gripper-feature-stability.md) · [工作空间覆盖](docs/results/2026-09-05-openarm-workspace-coverage.md) · [视觉闭环第十一步](docs/results/2026-09-05-openarm-vision-in-loop-step11-ycliff.md) · [第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段
 
-1. **改用几何稳定特征测量夹爪**（指尖最低点、或基于手部模型的配准）——已证实 ROI 与分位调参都只能减轻、不能根治「可见表面质心随构型移动」，这是当前精度的根本瓶颈。
+1. **解决「窗口小则稳、小则脱靶」的冲突**——两段式自适应半径（大窗定位→小窗精测），或给夹爪加标记点使窗口中心不再依赖带偏置的 TF。这是把 3.1 mm 精度用到有偏置场景的前提。
 2. **测右臂覆盖 y < 0 区域**，验证双臂互补能否覆盖整个桌面。
 3. 加密可达区边界（y ∈ [−0.10, 0]、x ∈ [0.38, 0.40]），并用 descend 高度而非 hover 高度重定可达极限。
 4. **等待 descend 偶发失败复现**——诊断日志已就位（`move_to` 现记录 MoveIt `error_code`），下次发生即可定性；主动复现需 30–50 次，性价比低。

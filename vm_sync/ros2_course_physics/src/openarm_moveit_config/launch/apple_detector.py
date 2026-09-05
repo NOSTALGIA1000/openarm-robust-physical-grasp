@@ -50,7 +50,7 @@ class UniversalDetector(Node):
         self.declare_parameter('gripper_band_above', 0.03)
         self.declare_parameter('gripper_min_area', 15)
         self.declare_parameter('gripper_deep_pct', 60.0)
-        self.declare_parameter('gripper_roi_px', 55)
+        self.declare_parameter('gripper_roi_px', 30)
         self.declare_parameter('roi_offset_world_x', 0.076)
         self.declare_parameter('roi_offset_world_y', 0.0)
         self.declare_parameter('roi_offset_world_z', 0.0)
@@ -234,6 +234,56 @@ class UniversalDetector(Node):
             z=float(np.mean(dd)),
         ), n
 
+    def _feature_candidates(self, depth_img, lo, hi, centre):
+        """Log several candidate gripper features from one ROI, to compare
+        their stability before committing to one.
+
+        The published value stays the deep-percentile centroid; this only
+        records alternatives. Measured problem: at a fixed object position two
+        trials differed by 30.8mm while the ROI centre moved 3px and in-window
+        pixel count changed 31%, i.e. the centroid follows how much hand
+        happens to be visible. A feature tied to the contour's extent or to the
+        jaw plane should not.
+        """
+        u0, v0 = centre
+        h, w = depth_img.shape
+        r = int(self.gripper_roi_px)
+        u1, u2 = max(0, int(u0) - r), min(w, int(u0) + r + 1)
+        v1, v2 = max(0, int(v0) - r), min(h, int(v0) + r + 1)
+        roi = np.zeros(depth_img.shape, bool)
+        roi[v1:v2, u1:u2] = True
+        sel = roi & (depth_img > lo) & (depth_img < hi)
+        n = int(sel.sum())
+        if n < 40:
+            return "cand: n=%d too few" % n
+
+        vs, us = np.nonzero(sel)
+        dd = depth_img[sel].astype(np.float64)
+
+        def cam_y(vv, d):
+            return float(np.mean((vv - self.cy) * d / self.fy))
+
+        # A: deep-percentile centroid (current published value)
+        cut = float(np.percentile(dd, self.gripper_deep_pct))
+        m = dd >= cut
+        a = cam_y(vs[m], dd[m]) if m.sum() >= 8 else float('nan')
+
+        # B: bbox centre of the in-window mask, at the band's median depth
+        dmed = float(np.median(dd))
+        b = float(((vs.min() + vs.max()) / 2.0 - self.cy) * dmed / self.fy)
+
+        # C: deepest 10% centroid
+        cut90 = float(np.percentile(dd, 90.0))
+        m90 = dd >= cut90
+        c = cam_y(vs[m90], dd[m90]) if m90.sum() >= 8 else float('nan')
+
+        # D: single deepest point
+        i = int(np.argmax(dd))
+        dpt = float((vs[i] - self.cy) * dd[i] / self.fy)
+
+        return ("cand n=%d vspan=%d..%d | A_centroid=%.4f B_bbox=%.4f "
+                "C_deep10=%.4f D_deepest=%.4f" % (n, vs.min(), vs.max(), a, b, c, dpt))
+
     def _blob_diag(self, depth_img, lo, hi, min_area):
         """Describe the blob that would be selected, to identify misselection.
 
@@ -342,6 +392,9 @@ class UniversalDetector(Node):
         grip, nroi = None, -1
         if centre is not None:
             grip, nroi = self._roi_centroid_cam(cv_image, lo, hi, centre)
+            self.get_logger().info(
+                self._feature_candidates(cv_image, lo, hi, centre),
+                throttle_duration_sec=0.4)
         if grip is None:
             grip = self._deep_centroid_cam(
                 cv_image, lo, hi, self.gripper_min_area)
