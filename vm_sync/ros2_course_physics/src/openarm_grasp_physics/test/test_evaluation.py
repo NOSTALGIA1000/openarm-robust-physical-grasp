@@ -125,3 +125,28 @@ def test_monitoring_timeout_alone_blocks_success():
     result = classify_trial(observations(timed_out=True), CONFIG)
 
     assert result is not FailureCategory.SUCCESS
+
+
+def test_detector_timeout_is_not_reported_as_planning_failure():
+    """A trial with no detector fix never reached the planner.
+
+    Reporting it as planning_failure hid a perception-readiness problem inside
+    a kinematics category: of 20 such trials, 5 were actually this, which had
+    to be recovered by grepping picker logs for 'stage -> hover'.
+    """
+    result = classify_trial(observations(detector_ok=False), CONFIG)
+    assert result is FailureCategory.DETECTOR_TIMEOUT
+
+
+def test_detector_timeout_outranks_a_genuine_planning_failure():
+    """Never getting a fix explains the trial; planning never ran."""
+    result = classify_trial(
+        observations(detector_ok=False, planning_ok=False), CONFIG)
+    assert result is FailureCategory.DETECTOR_TIMEOUT
+
+
+def test_detector_ok_defaults_true_so_existing_records_are_unchanged():
+    assert classify_trial(observations(), CONFIG) is FailureCategory.SUCCESS
+    assert classify_trial(
+        observations(planning_ok=False), CONFIG
+    ) is FailureCategory.PLANNING_FAILURE

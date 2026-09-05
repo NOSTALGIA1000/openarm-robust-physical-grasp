@@ -62,3 +62,37 @@
 - **y 向的偶发 `planning_failure`**（y=128、y=256 各一次）是另一回事：偶发而非系统性，未诊断。y=192 mm 是 3/3，说明 y 向在该量级尚未触及可达边界。
 - y 向 192–256 mm 之间的感知断崖仍未加密。
 - 若要继续推进 x 向，需重新布置场景，那会使先前所有 x 向数据失去可比性。
+
+---
+
+## 6. 追加：y 向偶发失败是两类，且其中一类是分类错误
+
+诊断 y 向偶发 `planning_failure` 时发现它们并非同一回事：
+
+| trial | 走到哪一步 | MoveIt 日志 |
+|---|---|---|
+| `fb_y256_1`、`dp01` | **descend 阶段**失败 | `Solution was found` ×3（hover 与 rehover 都成功） |
+| `om09`、`fb_y128_1` | **连 hover 都没进** | 无任何记录 |
+
+后一类根本没到规划器：探测器未报告 → `use_detector_target` 检查失败 → `_finish(False, ...)` → `planning_ok=False` → 归类 `planning_failure`。**感知未就绪被记成了运动学失败。**
+
+### 污染范围
+
+统计全部标为 `planning_failure` 的 20 次试验（依据 picker 日志是否出现 `stage -> hover`）：
+
+- **真规划失败 15 次**
+- **实为探测器未报告 5 次**（`om09`、`p88e01`、`p88e02`、`fb_y128_1`、`yaw031`）
+
+需要修订的结论：
+
+- 第九步「y=128 mm 2/2，另 1 次 `planning_failure`」——那次（`fb_y128_1`）实为**感知未就绪**，应记为 2/2 加 1 次基础设施失败；
+- §1–§4 的 x 向结论**不受影响**：`reach112_*`、`fb_x128_*`、`yaw001` 全部是真规划失败；
+- 第八步 88 百分位那批的 4 次 `planning_failure` 中 2 次属此类，但该方案被否定依据的是残差双峰，结论不变。
+
+### 已修
+
+`FailureCategory` 新增 `DETECTOR_TIMEOUT`，`TrialObservations` 新增 `detector_ok`（默认 `True`，历史记录与既有调用语义不变），`classify_trial` 优先判定该项——没拿到观测的试验，谈不上规划成败。新增 3 个测试覆盖该分支（52/52 通过）。
+
+### 尚未诊断
+
+`descend` 阶段的偶发失败（`fb_y256_1`、`dp01`）：hover 与 rehover 均成功，仅 descend 无解。descend 的位置容差为 0.003 m、姿态 0.01 rad，比 hover 的 0.005 m 更严，是可疑点，但未验证。

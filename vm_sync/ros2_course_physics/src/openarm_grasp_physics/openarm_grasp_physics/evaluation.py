@@ -12,6 +12,7 @@ from openarm_grasp_physics.config import GraspConfig
 
 
 class FailureCategory(str, Enum):
+    DETECTOR_TIMEOUT = "detector_timeout"
     PLANNING_FAILURE = "planning_failure"
     GRIPPER_COMMAND_FAILURE = "gripper_command_failure"
     NO_CONTACT = "no_contact"
@@ -35,11 +36,18 @@ class TrialObservations:
     hold_completed: bool
     hold_bilateral_ratio: float
     max_drift_m: float
+    # A trial that never got a detector fix never reached the planner.
+    # Folding it into planning_failure hid a perception-readiness
+    # problem inside a kinematics category: of 20 such trials, 5 were
+    # actually this. Defaults True so existing callers keep their meaning.
+    detector_ok: bool = True
 
 
 def classify_trial(
     observations: TrialObservations, config: GraspConfig
 ) -> FailureCategory:
+    if not observations.detector_ok:
+        return FailureCategory.DETECTOR_TIMEOUT
     if not observations.planning_ok:
         return FailureCategory.PLANNING_FAILURE
     if not observations.gripper_ok:

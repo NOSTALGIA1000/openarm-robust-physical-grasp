@@ -444,7 +444,7 @@ class PhysicsPicker(Node):
                 self.get_logger().error(
                     "use_detector_target is set but the detector never reported; "
                     "refusing to silently fall back to ground truth")
-                return self._finish(False, gripper_ok, True)
+                return self._finish(True, gripper_ok, True, detector_ok=False)
             dx, dy, dz = self._target
             x, y = dx, dy
             obj_z = dz - self.config.detector_z_bias
@@ -517,7 +517,8 @@ class PhysicsPicker(Node):
                     "relative_correction is set but no paired object/gripper "
                     "observation arrived within {:.1f}s (needs "
                     "DETECTOR_CAM_FRAME=1)".format(self.config.redetect_timeout_s))
-                return self._finish(planning_ok, gripper_ok, True)
+                return self._finish(planning_ok, gripper_ok, True,
+                                    detector_ok=False)
 
             with self._lock:
                 gx = self._latest.gripper_pose.position.x
@@ -682,13 +683,15 @@ class PhysicsPicker(Node):
                 window_start = None
             time.sleep(0.01)
 
-    def _finish(self, planning_ok, gripper_ok, timed_out, hold_completed=False):
+    def _finish(self, planning_ok, gripper_ok, timed_out, hold_completed=False,
+                detector_ok=True):
         with self._lock:
             ratio = (
                 self._hold_bilateral / self._hold_total if self._hold_total else 0.0
             )
             observations = TrialObservations(
                 planning_ok=planning_ok,
+                detector_ok=detector_ok,
                 gripper_ok=gripper_ok,
                 timed_out=timed_out,
                 any_contact=self._any_contact,
