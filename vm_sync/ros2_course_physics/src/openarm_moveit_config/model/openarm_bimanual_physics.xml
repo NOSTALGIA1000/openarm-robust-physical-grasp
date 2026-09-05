@@ -260,6 +260,32 @@
                           <geom name="openarm_left_hand_collision" pos="0.0 0.005 -0.6585"
                             quat="1.0 0.0 0.0 0.0" type="mesh" mesh="hand_collision"
                             class="collision" />
+                          <!-- Vision marker for optical gripper localisation.
+                               The ROI centre was projected through TF, which
+                               carries the very hand-eye bias the relative
+                               measurement exists to cancel, so the window drifts
+                               off the hand as bias grows. Locating this marker
+                               in the image instead breaks that circular
+                               dependency.
+                               Depth is the only channel available, so the marker
+                               has to separate geometrically: wrist and hand are
+                               depth-continuous at 0.60-0.70, forearm sits near
+                               0.46, and this sits at ~0.53 in the gap between
+                               them. Height is set from the hand body's hover
+                               position of z~0.5965 (TCP 0.5165 plus the 0.08
+                               hand-to-TCP offset), not from the TCP itself:
+                               getting that wrong put the marker at depth 0.45,
+                               inside the forearm's band, and the detector
+                               locked onto clutter at the image edge. Local -z is away from the jaw, i.e. toward
+                               the camera in the hover attitude.
+                               contype/conaffinity 0 keeps it out of physics, and
+                               the body carries an explicit inertial so the geom
+                               adds no mass. It is absent from the URDF, so MoveIt
+                               planning is unaffected. -->
+                          <geom name="openarm_left_hand_marker" type="sphere"
+                            pos="0 0 -0.0735" size="0.012"
+                            rgba="1 0.2 0.2 1" contype="0" conaffinity="0"
+                            group="0" />
                           <geom name="openarm_left_hand_visual_0" pos="0.0 0.005 -0.6585"
                             quat="1.0 0.0 0.0 0.0" material="metal_silver" type="mesh"
                             mesh="hand_0.obj" class="visual" />

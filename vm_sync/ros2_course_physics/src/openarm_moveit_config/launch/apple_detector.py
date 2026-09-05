@@ -51,6 +51,16 @@ class UniversalDetector(Node):
         self.declare_parameter('gripper_min_area', 15)
         self.declare_parameter('gripper_deep_pct', 60.0)
         self.declare_parameter('gripper_roi_px', 30)
+        # Default off: with depth as the only channel the marker cannot be
+        # separated from the forearm, which spans 0.40-0.60 continuously
+        # while the marker sits at 0.53 inside that range. Needs an RGB
+        # channel to be usable. See the 2026-09-05 marker document.
+        self.declare_parameter('use_marker_roi', False)
+        self.declare_parameter('marker_depth_lo', 0.50)
+        self.declare_parameter('marker_depth_hi', 0.56)
+        self.declare_parameter('marker_min_px', 60)
+        self.declare_parameter('marker_max_px', 1200)
+        self.declare_parameter('marker_min_circularity', 0.72)
         self.declare_parameter('roi_offset_world_x', 0.076)
         self.declare_parameter('roi_offset_world_y', 0.0)
         self.declare_parameter('roi_offset_world_z', 0.0)
@@ -61,6 +71,13 @@ class UniversalDetector(Node):
         self.gripper_min_area = self.get_parameter('gripper_min_area').value
         self.gripper_deep_pct = self.get_parameter('gripper_deep_pct').value
         self.gripper_roi_px = self.get_parameter('gripper_roi_px').value
+        self.use_marker_roi = self.get_parameter('use_marker_roi').value
+        self.marker_depth_lo = self.get_parameter('marker_depth_lo').value
+        self.marker_depth_hi = self.get_parameter('marker_depth_hi').value
+        self.marker_min_px = self.get_parameter('marker_min_px').value
+        self.marker_max_px = self.get_parameter('marker_max_px').value
+        self.marker_min_circularity = self.get_parameter(
+            'marker_min_circularity').value
         self.roi_offset_world = (
             self.get_parameter('roi_offset_world_x').value,
             self.get_parameter('roi_offset_world_y').value,
@@ -234,6 +251,56 @@ class UniversalDetector(Node):
             z=float(np.mean(dd)),
         ), n
 
+    def _find_marker(self, depth_img):
+        """Locate the gripper marker in the image, without using TF.
+
+        The kinematic ROI centre had to be projected through the camera->world
+        extrinsic, which carries the hand-eye bias being cancelled, so the
+        window slid off the hand as bias grew (54px at 64mm, 163px at 192mm).
+        The marker occupies its own depth interval between forearm (~0.46) and
+        the depth-continuous wrist/hand (0.60-0.70), so it can be found from
+        the depth image alone and the circular dependency disappears.
+
+        Returns (u, v) or None. Size is bounded both ways: too small is noise,
+        too large means the band caught something else and the reading should
+        be refused rather than silently wrong.
+        """
+        mask = (((depth_img > self.marker_depth_lo) &
+                 (depth_img < self.marker_depth_hi)) * 255).astype(np.uint8)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return None
+        # Area bounds alone admit forearm fragments that happen to fall in the
+        # band: measured, the same band returned centres at u=6, u=105 and
+        # u=199 across three frames. The marker is a sphere, so its silhouette
+        # is a disc; circularity separates it from arbitrary fragments.
+        best, best_score, cand = None, 0.0, []
+        for c in contours:
+            a = cv2.contourArea(c)
+            if a < self.marker_min_px or a > self.marker_max_px:
+                continue
+            per = cv2.arcLength(c, True)
+            if per <= 0:
+                continue
+            circ = 4.0 * math.pi * a / (per * per)
+            M = cv2.moments(c)
+            cu = M["m10"] / M["m00"] if M["m00"] else -1
+            cand.append("a=%.0f circ=%.2f u=%.0f" % (a, circ, cu))
+            if circ < self.marker_min_circularity:
+                continue
+            if circ > best_score:
+                best, best_score = c, circ
+        if cand:
+            self.get_logger().info("marker cand: " + " ; ".join(cand[:5]),
+                                   throttle_duration_sec=1.0)
+        if best is None:
+            return None
+        M = cv2.moments(best)
+        if M["m00"] == 0:
+            return None
+        return (M["m10"] / M["m00"], M["m01"] / M["m00"])
+
     def _feature_candidates(self, depth_img, lo, hi, centre):
         """Log several candidate gripper features from one ROI, to compare
         their stability before committing to one.
@@ -388,7 +455,16 @@ class UniversalDetector(Node):
         # therefore only usable while the bias stays under roughly the radius.
         # Beyond that, fall back to the whole-band deep percentile, which is
         # noisier but has no such dependence.
-        centre = self._project_hint()
+        # Marker first: it needs no TF and so does not inherit the bias.
+        # Fall back to the kinematic projection when the marker is not visible.
+        centre, csrc = None, "none"
+        if self.use_marker_roi:
+            centre = self._find_marker(cv_image)
+            if centre is not None:
+                csrc = "marker"
+        if centre is None:
+            centre = self._project_hint()
+            csrc = "tf" if centre is not None else "none"
         grip, nroi = None, -1
         if centre is not None:
             grip, nroi = self._roi_centroid_cam(cv_image, lo, hi, centre)
@@ -404,8 +480,8 @@ class UniversalDetector(Node):
             "pixels=%d out=%s | %s"
             % (self.gripper_z_hint, expected, lo, hi, npix,
                ("%.4f,%.4f,%.4f" % (grip.x, grip.y, grip.z)) if grip else "NONE",
-               ("roi=%s n=%d | " % (
-                   ("%.0f,%.0f" % centre) if centre else "NONE", nroi))
+               ("roi=%s[%s] n=%d | " % (
+                   ("%.0f,%.0f" % centre) if centre else "NONE", csrc, nroi))
                + self._blob_diag(cv_image, lo, hi, self.gripper_min_area)),
             throttle_duration_sec=0.4)
         if grip is not None:
