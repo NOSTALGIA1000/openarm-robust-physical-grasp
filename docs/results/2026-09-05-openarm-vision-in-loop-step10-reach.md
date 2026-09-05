@@ -96,3 +96,52 @@
 ### 尚未诊断
 
 `descend` 阶段的偶发失败（`fb_y256_1`、`dp01`）：hover 与 rehover 均成功，仅 descend 无解。descend 的位置容差为 0.003 m、姿态 0.01 rad，比 hover 的 0.005 m 更严，是可疑点，但未验证。
+
+---
+
+## 7. 追加：descend 偶发失败——排除两项假设，未能复现
+
+原始数据：`docs/results/physics_grasp/stage18_errcode/`（9 次，全部 `sim_time` 单调）
+
+### 7.1 两项假设被否定
+
+**假设一：descend 的位置容差 0.003 m 过严（§5 曾列为可疑点）。** 查 `dp01`、`fb_y256_1` 的 MoveIt 日志，两次 descend 都走到了
+
+```
+Starting trajectory execution ...
+left_arm_controller started execution
+Goal reached, success!
+Completed trajectory execution with status SUCCEEDED
+```
+
+**规划与执行都成功。** 至少「规划不出来」不成立。
+
+**假设二：OOM 杀死仿真器。** 两次日志末尾都有 `mujoco_ros2_control: process has died, exit code -9`（SIGKILL），一度据此判定为内存不足。**该判断是把结果当成了原因**：SIGKILL 出现在 trial 判定**之后**，来自下一次试验 `preflight.sh` 的 `kill -9`，属正常清理；且实测内存余量 4.3 GB、`dmesg` 无 OOM 记录。
+
+### 7.2 真正卡住诊断的地方
+
+`Completed trajectory execution with status SUCCEEDED` 来自 `trajectory_execution_manager`，而 `move_to` 判定依据是 action 的 `error_code.val == 1`。**两者可以不一致**——轨迹执行完毕仍可能返回 `GOAL_TOLERANCE_VIOLATED(-6)` 或 `CONTROL_FAILED(-4)`。而该错误码从未被打印，只能从时间戳反推，反推不出结论。
+
+已在 `move_to` 中记录错误码与超时，下次发生时直接给出判定依据：
+
+```python
+code = result_future.result().result.error_code.val
+if code != 1:
+    self.get_logger().error(
+        "move_to failed with MoveIt error_code {} at ({:.4f}, {:.4f}, "
+        "{:.4f}) tol={:.4f}".format(code, x, y, z, tolerance))
+```
+
+### 7.3 未能复现
+
+同条件跑 10 次：7 次 success、1 次 `unilateral_contact`、1 次 `detector_timeout`、1 次 400 s 超时。**零次 descend 失败，因此没有错误码可读。**
+
+合并历史数据，发生率约 **2/30 ≈ 6.7%**。10 次抓不到该事件的概率约 50%，**未复现属正常，不构成「问题已消失」的证据**。要稳定捕获需 30–50 次（约 1.5 小时）。
+
+附带验证：`ec01` 被正确归类为 `detector_timeout`——上一节的分类修复在真实批次中生效，换作以前会被记成 `planning_failure`。
+
+### 7.4 结论
+
+- descend 偶发失败**不是**规划失败，**不是** OOM；
+- 真实原因待其下次发生时由 `error_code` 直接给出；
+- 影响面有限：发生率约 6.7%，且已确认与感知无关，不影响容差结论。

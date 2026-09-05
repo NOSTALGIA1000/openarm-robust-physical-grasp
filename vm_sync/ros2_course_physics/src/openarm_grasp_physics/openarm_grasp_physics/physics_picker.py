@@ -357,8 +357,21 @@ class PhysicsPicker(Node):
             return False
         result_future = handle.get_result_async()
         if not self._spin_future(result_future, self.config.plan_timeout_s * 20):
+            self.get_logger().error(
+                "move_to timed out waiting for the result at ({:.4f}, {:.4f}, "
+                "{:.4f})".format(x, y, z))
             return False
-        return result_future.result().result.error_code.val == 1
+        code = result_future.result().result.error_code.val
+        if code != 1:
+            # MoveIt's "Completed trajectory execution with status SUCCEEDED"
+            # comes from the execution manager and is not the action's verdict;
+            # a run can execute fully and still return GOAL_TOLERANCE_VIOLATED
+            # (-6) or CONTROL_FAILED (-4). Without the code the two are
+            # indistinguishable in the logs.
+            self.get_logger().error(
+                "move_to failed with MoveIt error_code {} at ({:.4f}, {:.4f}, "
+                "{:.4f}) tol={:.4f}".format(code, x, y, z, tolerance))
+        return code == 1
 
     def send_gripper(self, position, max_effort):
         goal = GripperCommand.Goal()
