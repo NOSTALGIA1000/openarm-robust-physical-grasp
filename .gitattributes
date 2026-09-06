@@ -1,5 +1,11 @@
 * text=auto
 *.py text eol=lf
+# Shell scripts are copied to the Linux VM; a CR would make bash fail on
+# every line. core.autocrlf=true on Windows would add one without this.
+*.sh text eol=lf
+*.yaml text eol=lf
+*.urdf text eol=lf
+*.srdf text eol=lf
 *.xml text eol=lf
 *.md text eol=lf
 *.csv text eol=lf
