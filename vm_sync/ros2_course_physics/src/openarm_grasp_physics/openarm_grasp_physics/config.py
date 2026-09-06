@@ -88,6 +88,23 @@ class GraspConfig:
     # experiment can be re-run.
     measure_samples: int = 1
 
+    # Radial correction for the optical readings, in metres of effective lever.
+    #
+    # A body's optical centroid sits off its own frame origin by an amount that
+    # grows with how far off the optical axis it is seen. The two terms cancel
+    # while object and gripper are viewed from the same direction - which is
+    # the case at hover with no calibration error, where the residual measures
+    # +1.6mm - and stop cancelling once a bias separates them: at 192mm the
+    # gripper's reading runs 12.3mm long and the residual reaches -11.1mm.
+    #
+    # Measured over 18 trials at three biases, the overshoot is 47.8 +- 4.6mm
+    # times the sine of the off-axis angle. That angle comes out of the camera
+    # reading itself and never touches the extrinsic, which is what makes the
+    # term computable on a system that is never calibrated. Zero keeps the
+    # behaviour every earlier batch was measured under.
+    view_gain_gripper: float = 0.0
+    view_gain_object: float = 0.0
+
     # Relative (differential) visual correction. Measures object and gripper
     # optically in the camera frame and adds their difference to the gripper
     # pose known from kinematics:

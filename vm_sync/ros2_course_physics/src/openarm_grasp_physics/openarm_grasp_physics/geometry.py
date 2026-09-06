@@ -39,3 +39,26 @@ def distance(a: Sequence[float], b: Sequence[float]) -> float:
 
 def elevation(object_z: float, baseline_z: float) -> float:
     return float(object_z) - float(baseline_z)
+
+
+def shrink_radially(point: Vec3, gain: float) -> Vec3:
+    """Pull an optical reading in towards the optical axis by gain*sin(theta).
+
+    A body's optical centroid sits off its own origin by an amount that grows
+    with how far off-axis it is seen, along the radial direction. The offsets
+    of object and gripper cancel while both are viewed from the same
+    direction, and stop cancelling once a calibration bias separates them -
+    which is where the residual comes from. Theta is taken from the reading
+    itself, so no extrinsic is involved.
+
+    gain is the effective lever in metres; zero returns the point unchanged.
+    """
+    x, y, z = point
+    if not gain or z <= 0.0:
+        return point
+    lateral = math.hypot(x, y)
+    if lateral <= 1e-9:
+        return point
+    sin_theta = lateral / math.hypot(lateral, z)
+    scale = max(0.0, (lateral - gain * sin_theta) / lateral)
+    return (x * scale, y * scale, z)

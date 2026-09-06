@@ -42,6 +42,8 @@ timeout 400 ros2 run openarm_grasp_physics physics_picker --ros-args \
   -p use_sim_time:=true -p trial_id:="$TRIAL" -p output_dir:="$OUT" \
   -p use_detector_target:=true -p relative_correction:=true \
   -p rel_offset_x:="$OFFX" -p rel_offset_y:="$OFFY" \
+  -p view_gain_gripper:="${VIEW_GAIN_GRIPPER:-0.0}" \
+  -p view_gain_object:="${VIEW_GAIN_OBJECT:-0.0}" \
   > "/tmp/picker_${TRIAL}.log" 2>&1
 echo "INSTABILITY=$(grep -c 'unstable\|QACC' "$LOG")"
 grep -E 'relative correction|trial .* ->' "/tmp/picker_${TRIAL}.log" | tail -3

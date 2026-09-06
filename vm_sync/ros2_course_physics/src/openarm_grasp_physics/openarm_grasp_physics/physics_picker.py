@@ -43,7 +43,7 @@ from openarm_grasp_physics.evaluation import (
     TrialObservations,
     classify_trial,
 )
-from openarm_grasp_physics.geometry import distance, elevation, relative_position
+from openarm_grasp_physics.geometry import shrink_radially, distance, elevation, relative_position
 from openarm_grasp_physics.trial_record import Sample, TrialRecorder, trial_seed
 
 GROUP = "left_arm"
@@ -77,6 +77,8 @@ class PhysicsPicker(Node):
         self.declare_parameter("branch_tolerance", 0.08)
         self.declare_parameter("settle_before_measure_s", 0.0)
         self.declare_parameter("measure_samples", 1)
+        self.declare_parameter("view_gain_gripper", 0.0)
+        self.declare_parameter("view_gain_object", 0.0)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -103,6 +105,8 @@ class PhysicsPicker(Node):
             settle_before_measure_s=self.get_parameter(
                 "settle_before_measure_s").value,
             measure_samples=self.get_parameter("measure_samples").value,
+            view_gain_gripper=self.get_parameter("view_gain_gripper").value,
+            view_gain_object=self.get_parameter("view_gain_object").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
@@ -632,6 +636,10 @@ class PhysicsPicker(Node):
                 "gripper pose z={:.4f} quat=({:.4f},{:.4f},{:.4f},{:.4f})"
                 .format(gz, gq.x, gq.y, gq.z, gq.w))
 
+            raw_grip_cam, raw_obj_cam = grip_cam, obj_cam
+            grip_cam = shrink_radially(grip_cam, self.config.view_gain_gripper)
+            obj_cam = shrink_radially(obj_cam, self.config.view_gain_object)
+
             # camera_optical -> world is a 180 deg rotation about x, i.e.
             # diag(1, -1, -1); world -> camera_base_link carries no rotation.
             rel_x = obj_cam[0] - grip_cam[0]
@@ -653,10 +661,13 @@ class PhysicsPicker(Node):
             # the camera pose is unknown. The surface-versus-origin offset that
             # rel_offset absorbs should scale with it, which is what makes
             # rel_offset a computable quantity rather than a calibrated one.
-            view_tan = math.hypot(grip_cam[0], grip_cam[1]) / grip_cam[2]                 if grip_cam[2] else float("nan")
+            view_tan = math.hypot(raw_grip_cam[0], raw_grip_cam[1]) / raw_grip_cam[2]                 if raw_grip_cam[2] else float("nan")
             self.recorder.record_measurement(
-                obj_cam_x=obj_cam[0], obj_cam_y=obj_cam[1], obj_cam_z=obj_cam[2],
-                grip_cam_x=grip_cam[0], grip_cam_y=grip_cam[1], grip_cam_z=grip_cam[2],
+                obj_cam_x=raw_obj_cam[0], obj_cam_y=raw_obj_cam[1],
+                obj_cam_z=raw_obj_cam[2],
+                grip_cam_x=raw_grip_cam[0], grip_cam_y=raw_grip_cam[1],
+                grip_cam_z=raw_grip_cam[2],
+                grip_cam_y_corrected=grip_cam[1],
                 gripper_kin_x=gx, gripper_kin_y=gy, gripper_kin_z=gz,
                 rel_x=rel_x, rel_y=rel_y,
                 target_x=new_x, target_y=new_y,

@@ -1,6 +1,6 @@
 import math
 
-from openarm_grasp_physics.geometry import distance, elevation, relative_position
+from openarm_grasp_physics.geometry import distance, elevation, relative_position, shrink_radially
 
 IDENTITY = (1.0, 0.0, 0.0, 0.0)
 YAW_90 = (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5))
@@ -50,3 +50,32 @@ def test_slip_shows_up_as_relative_drift():
 
 def test_elevation_is_measured_from_the_settled_baseline():
     assert math.isclose(elevation(0.465, 0.445), 0.020, rel_tol=1e-9)
+
+
+def test_radial_shrink_is_a_no_op_without_gain():
+    point = (-0.19, 0.021, 0.68)
+    assert shrink_radially(point, 0.0) == point
+
+
+def test_radial_shrink_pulls_towards_the_axis_by_gain_times_sine():
+    # 3-4-5: lateral 0.03, depth 0.04, so sin(theta) = 0.6.
+    x, y, z = shrink_radially((0.03, 0.0, 0.04), 0.01)
+    assert z == 0.04
+    assert y == 0.0
+    assert abs(x - (0.03 - 0.01 * 0.6)) < 1e-12
+
+
+def test_radial_shrink_leaves_a_reading_on_the_axis_alone():
+    assert shrink_radially((0.0, 0.0, 0.68), 0.05) == (0.0, 0.0, 0.68)
+
+
+def test_radial_shrink_never_crosses_the_axis():
+    # The shrink is gain*sin(theta), and sin(theta) shrinks with the lateral
+    # offset too, so overshooting needs a gain larger than the depth.
+    x, y, _ = shrink_radially((0.001, 0.0, 0.68), 1.0)
+    assert x == 0.0 and y == 0.0
+
+
+def test_radial_shrink_of_a_near_axis_reading_stays_small():
+    x, _, _ = shrink_radially((0.001, 0.0, 0.68), 0.05)
+    assert 0.0 < x < 0.001
