@@ -108,3 +108,27 @@ def test_report_markdown_names_the_category(tmp_path):
 
     assert "insufficient_lift" in report
     assert "trial_005" in report
+
+
+def test_optical_measurements_reach_the_summary(tmp_path):
+    recorder = TrialRecorder(str(tmp_path), "trial_006", CONFIG)
+    recorder.add_sample(make_sample(0.1))
+    recorder.record_measurement(grip_cam_x=-0.1912, grip_cam_z=0.6822)
+    recorder.record_measurement(residual_y=0.0003)
+
+    summary = recorder.finish(OBSERVATIONS, FailureCategory.SUCCESS)
+
+    assert summary["measurements"]["grip_cam_x"] == -0.1912
+    assert summary["measurements"]["residual_y"] == 0.0003
+
+    with open(os.path.join(str(tmp_path), "trial_006", "trial.json")) as handle:
+        assert json.load(handle)["measurements"]["grip_cam_z"] == 0.6822
+
+
+def test_measurements_default_to_empty_when_none_recorded(tmp_path):
+    recorder = TrialRecorder(str(tmp_path), "trial_007", CONFIG)
+    recorder.add_sample(make_sample(0.1))
+
+    summary = recorder.finish(OBSERVATIONS, FailureCategory.SUCCESS)
+
+    assert summary["measurements"] == {}

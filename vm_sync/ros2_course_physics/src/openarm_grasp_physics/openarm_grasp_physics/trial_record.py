@@ -40,9 +40,20 @@ class TrialRecorder:
         self._config = config
         self._samples: List[Sample] = []
         self._stage_times: Dict[str, float] = {}
+        self._measurements: Dict[str, float] = {}
 
     def add_sample(self, sample: Sample) -> None:
         self._samples.append(sample)
+
+    def record_measurement(self, **values: float) -> None:
+        """Persist the optical measurements the correction is computed from.
+
+        Until this existed the camera-frame readings appeared only in the
+        node's log, so a finished batch could not be re-analysed for anything
+        the log had not already been asked to print - the whole method rests on
+        these two vectors and none of the 470 recorded trials contains them.
+        """
+        self._measurements.update({k: float(v) for k, v in values.items()})
 
     def mark_stage(self, stage: str, sim_time: float) -> None:
         self._stage_times[stage] = float(sim_time)
@@ -61,6 +72,7 @@ class TrialRecorder:
             "sample_count": len(self._samples),
             "stage_times": self._stage_times,
             "observations": dataclasses.asdict(observations),
+            "measurements": self._measurements,
             "config": self._config.snapshot(),
         }
 

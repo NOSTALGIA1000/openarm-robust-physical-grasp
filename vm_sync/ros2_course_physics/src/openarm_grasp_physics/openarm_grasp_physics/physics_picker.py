@@ -639,6 +639,22 @@ class PhysicsPicker(Node):
                 self.get_logger().info(
                     "hover joints: " + " ".join(
                         "j%s=%+.4f" % (k[-1], js[k]) for k in sorted(js)))
+            # The viewing direction to the gripper, straight out of the optical
+            # reading: no extrinsic is involved, so this is available even when
+            # the camera pose is unknown. The surface-versus-origin offset that
+            # rel_offset absorbs should scale with it, which is what makes
+            # rel_offset a computable quantity rather than a calibrated one.
+            view_tan = math.hypot(grip_cam[0], grip_cam[1]) / grip_cam[2]                 if grip_cam[2] else float("nan")
+            self.recorder.record_measurement(
+                obj_cam_x=obj_cam[0], obj_cam_y=obj_cam[1], obj_cam_z=obj_cam[2],
+                grip_cam_x=grip_cam[0], grip_cam_y=grip_cam[1], grip_cam_z=grip_cam[2],
+                gripper_kin_x=gx, gripper_kin_y=gy, gripper_kin_z=gz,
+                rel_x=rel_x, rel_y=rel_y,
+                target_x=new_x, target_y=new_y,
+                ground_truth_x=gt_x, ground_truth_y=gt_y,
+                residual_x=new_x - gt_x, residual_y=new_y - gt_y,
+                view_tan=view_tan,
+            )
             self.get_logger().info(
                 "relative correction -> x={:.4f} y={:.4f} (was x={:.4f} y={:.4f}); "
                 "gripper_kin x={:.4f} y={:.4f}, optical rel x{:+.4f} y{:+.4f}; "
