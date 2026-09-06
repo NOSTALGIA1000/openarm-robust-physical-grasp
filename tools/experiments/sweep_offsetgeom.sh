@@ -33,8 +33,12 @@ run_scheme() {
   for m in 000 064 128; do
     v=$(echo "scale=4; $m/1000" | bc)
     for r in $(seq 1 "$REPEATS"); do
+      # Keep the divergence count as well as the verdict: piping to
+      # tail -1 left only a detector line, discarding the stability
+      # check every batch in this project is supposed to report.
       bash "$EXPDIR/run_rel.sh" "og_${tag}_x${m}_${r}" "0$v" 0.0 \
-        stage35_offsetgeom 0.0 0.0 2>&1 | tail -1
+        stage35_offsetgeom 0.0 0.0 2>&1 \
+        | grep -E 'INSTABILITY|trial .* ->' | tail -2
     done
   done
 }
