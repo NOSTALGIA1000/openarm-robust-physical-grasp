@@ -47,6 +47,7 @@ def load(batch_dir, depth_min):
 def summarise(rows, axis):
     key = "residual_%s" % axis
     resid = [r[key] for r in rows]
+    other = [r["residual_x" if axis == "y" else "residual_y"] for r in rows]
     depth = [r["grip_cam_z"] for r in rows]
     tans = [r["view_tan"] for r in rows]
     sins = [t / math.sqrt(1.0 + t * t) for t in tans]
@@ -57,6 +58,8 @@ def summarise(rows, axis):
         "resid_mm": statistics.mean(resid) * 1000.0,
         "resid_sd_mm": sd(resid) * 1000.0,
         "resid_se_mm": sd(resid) * 1000.0 / math.sqrt(len(resid)),
+        "other_mm": statistics.mean(other) * 1000.0,
+        "other_sd_mm": sd(other) * 1000.0,
         "depth": statistics.mean(depth),
         "sin": statistics.mean(sins),
         "ratio_mm": statistics.mean(ratios) * 1000.0,
@@ -80,18 +83,22 @@ def main():
     for scheme in sorted({k[0] for k in kept}):
         print("")
         print("=== %s (axis %s) ===" % (scheme, args.axis))
-        print("%6s %4s %5s %14s %9s %9s" % (
-            "bias", "n", "drop", "residual mm", "grip_z", "resid/sin"))
+        # Both components, always. Printing only the axis under test is how a
+        # 12.4mm regression in x went unnoticed while y looked corrected.
+        cross = "x" if args.axis == "y" else "y"
+        print("%6s %4s %5s %14s %14s %9s" % (
+            "bias", "n", "drop", "residual %s mm" % args.axis,
+            "residual %s mm" % cross, "grip_z"))
         resids, ses, depths = [], [], []
         for bias in sorted(b for s_, b in kept if s_ == scheme):
             st = summarise(kept[(scheme, bias)], args.axis)
             resids.append(st["resid_mm"])
             ses.append(st["resid_se_mm"])
             depths.append(st["depth"])
-            print("%6d %4d %5d %8.2f+-%-5.2f %9.4f %9.2f" % (
+            print("%6d %4d %5d %8.2f+-%-5.2f %8.2f+-%-5.2f %9.4f" % (
                 bias, st["n"], len(dropped.get((scheme, bias), [])),
-                st["resid_mm"], st["resid_sd_mm"], st["depth"],
-                st["ratio_mm"]))
+                st["resid_mm"], st["resid_sd_mm"],
+                st["other_mm"], st["other_sd_mm"], st["depth"]))
         if len(resids) > 1:
             # The question is no longer whether residual/sin(theta) is
             # constant - that model came from a geometric account the zero-bias
