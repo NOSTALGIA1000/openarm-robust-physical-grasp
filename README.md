@@ -86,6 +86,8 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
+工程文档：[复现指南](docs/reproduction.md) · [相关工作与新颖性定位](docs/related-work.md)
+
 结论文档：[容差回溯复核](docs/results/2026-09-06-openarm-tolerance-retrospective.md) · [双峰根因调查](docs/results/2026-09-06-openarm-bimodality-root-cause.md) · [级联 ROI](docs/results/2026-09-05-openarm-cascade-roi.md) · [标记方案否定](docs/results/2026-09-05-openarm-marker-roi-infeasible.md) · [夹爪测量稳定性](docs/results/2026-09-05-openarm-gripper-feature-stability.md) · [工作空间覆盖](docs/results/2026-09-05-openarm-workspace-coverage.md) · [视觉闭环第十一步](docs/results/2026-09-05-openarm-vision-in-loop-step11-ycliff.md) · [第十步](docs/results/2026-09-05-openarm-vision-in-loop-step10-reach.md) · [第九步](docs/results/2026-09-05-openarm-vision-in-loop-step9-limits.md) · [第八步](docs/results/2026-09-04-openarm-vision-in-loop-step8-blobdrift.md) · [第七步](docs/results/2026-09-04-openarm-vision-in-loop-step7-randxy.md) · [第六步](docs/results/2026-09-04-openarm-vision-in-loop-step6-randpose.md) · [第五步](docs/results/2026-09-04-openarm-vision-in-loop-step5-xy.md) · [第四步](docs/results/2026-09-04-openarm-vision-in-loop-step4.md) · [第三步](docs/results/2026-09-04-openarm-vision-in-loop-step3.md) · [第二步](docs/results/2026-09-04-openarm-vision-in-loop-step2.md) · [第一步](docs/results/2026-09-04-openarm-vision-in-loop-step1.md) · [探测器精度](docs/results/2026-09-03-openarm-detector-accuracy.md) · [Stage 2](docs/results/2026-09-03-openarm-stage2-result.md) · [Stage 3](docs/results/2026-09-03-openarm-stage3-result.md) · [Stage 1](docs/results/2026-09-03-openarm-stage1-result.md) · [机制调查](docs/results/2026-09-02-openarm-grasp-mechanics-findings.md)
 
 ## 下一阶段

@@ -6,10 +6,12 @@
 # MoveIt returns spurious planning failures indistinguishable from real ones,
 # which silently corrupts timing-sensitive results.
 # Usage: preflight.sh [min_free_mb]   (default 1024)
+EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+source "$EXPDIR/env.sh"
 set -o pipefail
 
 MIN_FREE_MB="${1:-1024}"
-LOGDIR="$HOME/ros2_ws_course_repro/results/physics_grasp"
+LOGDIR="$OPENARM_RESULTS"
 mkdir -p "$LOGDIR"
 LOG="$LOGDIR/preflight.log"
 ts() { date '+%Y-%m-%d %H:%M:%S'; }

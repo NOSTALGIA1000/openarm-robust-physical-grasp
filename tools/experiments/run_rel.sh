@@ -3,19 +3,18 @@
 # optically, so a hand-eye translation error cancels in their difference.
 # Fresh launch per trial (a parked arm from a previous trial pollutes the
 # camera view -- see the 2026-09-04 vision-in-loop documents).
-export MUJOCO_DIR=/home/nostalgia/.local/lib/python3.10/site-packages/mujoco
-export DISPLAY=:0
+EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+source "$EXPDIR/env.sh"
 TRIAL="$1"; export CAM_BIAS_X="${2:-0.0}"; export CAM_BIAS_Y="${3:-0.0}"
 OUTDIR="${4:-stage4_relative}"; OFFX="${5:-0.0}"; OFFY="${6:-0.0}"
 export DETECTOR_UNLATCHED=1
 export DETECTOR_CAM_FRAME=1
-source /opt/ros/humble/setup.bash
-source "$HOME/ros2_ws_course_repro/ros2_ws/install_repro/setup.bash"
-export ROS_DOMAIN_ID=71
+source "$ROS_SETUP"
+source "$OPENARM_INSTALL/setup.bash"
 LOG="/tmp/physics_launch_${TRIAL}.log"
-OUT="$HOME/ros2_ws_course_repro/results/physics_grasp/$OUTDIR"
+OUT="$OPENARM_RESULTS/$OUTDIR"
 mkdir -p "$OUT"
-bash /tmp/preflight.sh 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
+bash "$EXPDIR/preflight.sh" 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
 setsid nohup ros2 launch openarm_moveit_config run_physics_grasp.launch.py viewer_render_period:=1.0 > "$LOG" 2>&1 < /dev/null &
 for i in $(seq 1 120); do grep -q 'Successfully loaded controller' "$LOG" 2>/dev/null && break; sleep 3; done
 for k in $(seq 1 60); do ros2 action list 2>/dev/null | grep -q '/move_action' && break; sleep 2; done

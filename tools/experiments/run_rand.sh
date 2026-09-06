@@ -1,23 +1,22 @@
 #!/usr/bin/env bash
 # Randomised-pose trial: object displaced and yawed per trial, so a batch
 # samples initial conditions instead of repeating one condition.
-export MUJOCO_DIR=/home/nostalgia/.local/lib/python3.10/site-packages/mujoco
-export DISPLAY=:0
-source /opt/ros/humble/setup.bash
-source "$HOME/ros2_ws_course_repro/ros2_ws/install_repro/setup.bash"
-export ROS_DOMAIN_ID=71
+EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+source "$EXPDIR/env.sh"
+source "$ROS_SETUP"
+source "$OPENARM_INSTALL/setup.bash"
 TRIAL="$1"; DX="$2"; DY="$3"; YAW="$4"; OUTDIR="${5:-stage2c}"
-MODEL="$HOME/ros2_ws_course_repro/ros2_ws/src/openarm_moveit_config/model"
+MODEL="$OPENARM_MODEL"
 SCENE="_rand_${TRIAL}.xml"
 LOG="/tmp/physics_launch_${TRIAL}.log"
-OUT="$HOME/ros2_ws_course_repro/results/physics_grasp/$OUTDIR"
+OUT="$OPENARM_RESULTS/$OUTDIR"
 mkdir -p "$OUT"
 
-python3 /tmp/add_pose_rand.py 0 "$DX" "$DY" "$YAW" "$SCENE" >/dev/null || exit 6
-cp "$MODEL/$SCENE" "$HOME/ros2_ws_course_repro/ros2_ws/install_repro/openarm_moveit_config/share/openarm_moveit_config/model/$SCENE"
-cp "$MODEL/openarm_bimanual_physics.xml" "$HOME/ros2_ws_course_repro/ros2_ws/install_repro/openarm_moveit_config/share/openarm_moveit_config/model/" 2>/dev/null
+python3 "$EXPDIR/add_pose_rand.py" 0 "$DX" "$DY" "$YAW" "$SCENE" >/dev/null || exit 6
+cp "$MODEL/$SCENE" "$OPENARM_SHARE/model/$SCENE"
+cp "$MODEL/openarm_bimanual_physics.xml" "$OPENARM_SHARE/model/" 2>/dev/null
 
-bash /tmp/preflight.sh 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
+bash "$EXPDIR/preflight.sh" 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
 export PHYSICS_SCENE="$SCENE"
 setsid nohup ros2 launch openarm_moveit_config run_physics_grasp.launch.py viewer_render_period:=1.0 > "$LOG" 2>&1 < /dev/null &
 for i in $(seq 1 120); do grep -q 'Successfully loaded controller' "$LOG" 2>/dev/null && break; sleep 3; done

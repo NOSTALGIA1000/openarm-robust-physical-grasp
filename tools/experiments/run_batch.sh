@@ -2,21 +2,20 @@
 # Stage 1 grasp-formation batch. Each trial gets a fresh launch (the scene has
 # no reset service, so a displaced object contaminates every later trial in the
 # same instance) and is validated before it is counted.
-export MUJOCO_DIR=/home/nostalgia/.local/lib/python3.10/site-packages/mujoco
-export DISPLAY=:0
-source /opt/ros/humble/setup.bash
-source "$HOME/ros2_ws_course_repro/ros2_ws/install_repro/setup.bash"
-export ROS_DOMAIN_ID=71
+EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+source "$EXPDIR/env.sh"
+source "$ROS_SETUP"
+source "$OPENARM_INSTALL/setup.bash"
 
 N="${1:-5}"
-OUT="$HOME/ros2_ws_course_repro/results/physics_grasp/stage3_acceptance"
+OUT="$OPENARM_RESULTS/stage3_acceptance"
 mkdir -p "$OUT"
 
 for i in $(seq 1 "$N"); do
   TRIAL=$(printf "s%02d" "$i")
   LOG="/tmp/physics_launch_${TRIAL}.log"
   echo "=== $TRIAL ==="
-  bash /tmp/preflight.sh 1024 >/dev/null || { echo "$TRIAL preflight_abort"; continue; }
+  bash "$EXPDIR/preflight.sh" 1024 >/dev/null || { echo "$TRIAL preflight_abort"; continue; }
 
   setsid nohup ros2 launch openarm_moveit_config run_physics_grasp.launch.py \
     viewer_render_period:=1.0 > "$LOG" 2>&1 < /dev/null &

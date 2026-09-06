@@ -11,10 +11,12 @@
 #
 # measure_samples stays at its default of 1: best-of-N is proven useless and
 # would otherwise silently differ from every earlier batch.
+EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+source "$EXPDIR/env.sh"
 for m in 240 256 264 272 280; do
   v=$(echo "scale=4; $m/1000" | bc)
   for r in 1 2 3 4; do
-    bash /tmp/run_rel.sh "yd${m}_${r}" 0.0 "0$v" stage34_ydense -0.0209 -0.0007 2>&1 | tail -1
+    bash "$EXPDIR/run_rel.sh" "yd${m}_${r}" 0.0 "0$v" stage34_ydense -0.0209 -0.0007 2>&1 | tail -1
   done
 done
 echo YDENSE_DONE

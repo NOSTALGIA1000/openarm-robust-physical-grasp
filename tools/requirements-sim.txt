@@ -1,0 +1,7 @@
+# Offline MuJoCo framework (vm_sync/experiments/openarm_robust_grasp/).
+# Versions are the ones every recorded result was produced under; they are
+# documented in prose across several result documents but were never pinned in
+# an installable file until now.
+mujoco==3.10.0
+numpy==1.21.5
+pytest==6.2.5
