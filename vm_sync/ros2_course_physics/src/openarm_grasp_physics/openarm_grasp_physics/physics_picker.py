@@ -44,13 +44,14 @@ from openarm_grasp_physics.evaluation import (
     classify_trial,
 )
 from openarm_grasp_physics.geometry import distance, elevation, relative_position
-from openarm_grasp_physics.trial_record import Sample, TrialRecorder
+from openarm_grasp_physics.trial_record import Sample, TrialRecorder, trial_seed
 
 GROUP = "left_arm"
 EE_LINK = "openarm_left_hand_tcp"
 GRIPPER_ACTION = "/left_hand_controller/gripper_cmd"
 PROTECTION_ID = "grasp_protection_sphere"
 PROTECTION_RADIUS = 0.06
+
 
 
 class PhysicsPicker(Node):
@@ -544,7 +545,15 @@ class PhysicsPicker(Node):
 
         # Stage 2: the observation the picker acts on is the true pose seen
         # through a miscalibrated transform, plus sensor noise.
-        rng = random.Random(hash(self.trial_id) & 0xffffffff)
+        #
+        # Derived with sha256 rather than hash(): Python randomises string
+        # hashing per process unless PYTHONHASHSEED is set, so the seed that
+        # looked like a function of the trial id was in fact different on every
+        # run, and none of the recorded noise realisations can be reproduced.
+        # The seed is recorded so future ones can be.
+        seed = trial_seed(self.trial_id)
+        rng = random.Random(seed)
+        self.recorder.record_measurement(vision_seed=seed)
         true_x, true_y = x, y
         x = true_x + self.config.calib_bias_x + rng.gauss(0.0, self.config.vision_noise_std)
         y = true_y + self.config.calib_bias_y + rng.gauss(0.0, self.config.vision_noise_std)

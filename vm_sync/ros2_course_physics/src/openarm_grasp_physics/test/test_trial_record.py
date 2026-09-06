@@ -4,7 +4,7 @@ import os
 
 from openarm_grasp_physics.config import GraspConfig
 from openarm_grasp_physics.evaluation import FailureCategory, TrialObservations
-from openarm_grasp_physics.trial_record import Sample, TrialRecorder
+from openarm_grasp_physics.trial_record import Sample, TrialRecorder, trial_seed
 
 CONFIG = GraspConfig()
 
@@ -132,3 +132,53 @@ def test_measurements_default_to_empty_when_none_recorded(tmp_path):
     summary = recorder.finish(OBSERVATIONS, FailureCategory.SUCCESS)
 
     assert summary["measurements"] == {}
+
+
+def test_environment_block_names_the_interpreter(tmp_path):
+    recorder = TrialRecorder(str(tmp_path), "trial_008", CONFIG)
+    recorder.add_sample(make_sample(0.1))
+
+    summary = recorder.finish(OBSERVATIONS, FailureCategory.SUCCESS)
+
+    assert summary["environment"]["python"]
+    assert summary["environment"]["platform"]
+
+
+def test_model_checksums_recorded_when_model_dir_is_set(tmp_path, monkeypatch):
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    (model_dir / "openarm_bimanual_physics.xml").write_text("<mujoco/>")
+    monkeypatch.setenv("OPENARM_MODEL", str(model_dir))
+
+    recorder = TrialRecorder(str(tmp_path), "trial_009", CONFIG)
+    recorder.add_sample(make_sample(0.1))
+    summary = recorder.finish(OBSERVATIONS, FailureCategory.SUCCESS)
+
+    digests = summary["environment"]["model_sha256"]
+    assert list(digests) == ["openarm_bimanual_physics.xml"]
+    assert len(digests["openarm_bimanual_physics.xml"]) == 64
+
+
+def test_missing_model_dir_does_not_break_the_record(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENARM_MODEL", str(tmp_path / "nope"))
+
+    recorder = TrialRecorder(str(tmp_path), "trial_010", CONFIG)
+    recorder.add_sample(make_sample(0.1))
+    summary = recorder.finish(OBSERVATIONS, FailureCategory.SUCCESS)
+
+    assert "model_sha256" not in summary["environment"]
+
+
+def test_seed_is_stable_across_processes():
+    # The point of the change: hash() would give a different answer in every
+    # process, so this value is pinned rather than merely recomputed.
+    assert trial_seed("og_cas_x000_1") == trial_seed("og_cas_x000_1")
+    assert trial_seed("og_cas_x000_1") != trial_seed("og_cas_x000_2")
+    assert 0 <= trial_seed("anything") < 2 ** 32
+
+
+def test_seed_matches_a_pinned_value():
+    import hashlib
+    expected = int.from_bytes(
+        hashlib.sha256(b"trial_042").digest()[:4], "big")
+    assert trial_seed("trial_042") == expected

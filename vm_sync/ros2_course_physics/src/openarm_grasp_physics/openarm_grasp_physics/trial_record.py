@@ -2,8 +2,12 @@
 
 import csv
 import dataclasses
+import hashlib
 import json
 import os
+import platform
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -31,6 +35,68 @@ class Sample:
     gripper_z: float
     elevation: float
     drift: float
+
+
+def trial_seed(trial_id: str) -> int:
+    """A seed that is actually a function of the trial id.
+
+    Python salts string hashing per process unless PYTHONHASHSEED is set, so
+    the previous seed - hash(trial_id) - took a different value on every run
+    while reading as though it were determined by the trial. None of the
+    recorded noise realisations can be reproduced; from here they can.
+    """
+    return int.from_bytes(hashlib.sha256(trial_id.encode()).digest()[:4], "big")
+
+
+def _sha256(path: str) -> str:
+    with open(path, "rb") as handle:
+        return hashlib.sha256(handle.read()).hexdigest()
+
+
+def describe_environment() -> dict:
+    """What was running when the trial was produced.
+
+    Only one result document in this project ever recorded an environment -
+    the 2026-08-22 stability screen, which stored a scene checksum and made
+    itself the sole batch whose inputs can be confirmed after the fact. Every
+    ROS2-phase batch since has been reconstructed from prose. The commit comes
+    from OPENARM_COMMIT when the runner sets it, else from git if the source
+    tree is a checkout; the model checksum from OPENARM_MODEL. Each part is
+    optional, because a missing checksum is worth less than a refused trial.
+    """
+    env = {"python": platform.python_version(), "platform": platform.platform()}
+
+    commit = os.environ.get("OPENARM_COMMIT", "").strip()
+    if not commit:
+        try:
+            commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+        except Exception:
+            commit = ""
+    if commit:
+        env["commit"] = commit
+
+    try:
+        import mujoco
+        env["mujoco"] = mujoco.__version__
+    except Exception:
+        pass
+
+    model_dir = os.environ.get("OPENARM_MODEL", "")
+    if model_dir:
+        digests = {}
+        for name in ("openarm_bimanual_physics.xml", "table_scene_physics.xml"):
+            path = os.path.join(model_dir, name)
+            try:
+                digests[name] = _sha256(path)
+            except OSError:
+                pass
+        if digests:
+            env["model_sha256"] = digests
+    return env
 
 
 class TrialRecorder:
@@ -74,6 +140,7 @@ class TrialRecorder:
             "observations": dataclasses.asdict(observations),
             "measurements": self._measurements,
             "config": self._config.snapshot(),
+            "environment": describe_environment(),
         }
 
         with open(os.path.join(self._trial_dir, "trial.json"), "w") as handle:
