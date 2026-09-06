@@ -4,40 +4,45 @@
 #
 # The workspace document measured rel_offset_x at -14.2mm with no bias and
 # -20.9mm at 64mm, and noted that a real dependence would break "calibrate
-# once, use everywhere". The geometric account (2026-09-06-openarm-rel-offset-
-# geometry.md) says the dependence is real but computable: bias moves the
-# camera, which changes the viewing angle theta, and the offset goes as
-# w*sin(theta). What decides it is whether rel_offset / sin(theta) holds
-# constant across bias, with theta taken from grip_cam - a reading that never
-# passes through the extrinsic.
+# once, use everywhere" - which is what calibration-free deployment needs.
 #
-# Runs with zero calibration offsets, so the residual is the inherent offset
-# itself. Each trial now records obj_cam, grip_cam, gripper_kin, view_tan and
-# the residual into trial.json, so the analysis reads the data rather than the
-# logs.
+# Runs with zero calibration offsets, so each residual is the inherent offset
+# itself. Every trial records obj_cam, grip_cam, gripper_kin, view_tan and the
+# residual into trial.json, so the analysis reads data rather than logs.
 #
 # Two window schedules, because a fixed window is placed by projecting through
 # the biased extrinsic and so moves with the bias, which would masquerade as a
-# dependence. The cascade re-centres on its own optical measurement and should
-# not.
+# dependence. The cascade re-centres on its own optical measurement.
 #
-# Usage: sweep_offsetgeom.sh [fixed|cascade]   (default: both, ~6h)
+# Axis matters, and the first run got it wrong. On x, 64mm left eight of twelve
+# trials with no gripper reading at all and 128mm gave eleven planning failures
+# out of twelve, because x meets the 112mm reach limit recorded in the step-10
+# result. The method's range is on y, which reaches 240mm, so that is the axis
+# on which the offset can actually be tracked against bias.
+#
+# Usage: sweep_offsetgeom.sh [fixed|cascade|both]
+#   AXIS=y (default) | x     BIASES="000 064 128 192"     REPEATS=12
 EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "$EXPDIR/env.sh"
 
 REPEATS="${REPEATS:-12}"
+AXIS="${AXIS:-y}"
+BIASES="${BIASES:-000 064 128 192}"
+OUTDIR="${OUTDIR:-stage36_offsetgeom_y}"
+
 run_scheme() {
-  local tag="$1" cascade="$2"
+  local tag="$1" cascade="$2" m v bx by r
   export DETECTOR_ROI_CASCADE="$cascade"
-  echo "=== $tag (roi_cascade=[$cascade]) ==="
-  for m in 000 064 128; do
+  echo "=== $tag (roi_cascade=[$cascade], axis=$AXIS) ==="
+  for m in $BIASES; do
     v=$(echo "scale=4; $m/1000" | bc)
+    if [ "$AXIS" = "x" ]; then bx="0$v"; by="0.0"; else bx="0.0"; by="0$v"; fi
     for r in $(seq 1 "$REPEATS"); do
-      # Keep the divergence count as well as the verdict: piping to
-      # tail -1 left only a detector line, discarding the stability
-      # check every batch in this project is supposed to report.
-      bash "$EXPDIR/run_rel.sh" "og_${tag}_x${m}_${r}" "0$v" 0.0 \
-        stage35_offsetgeom 0.0 0.0 2>&1 \
+      # Keep the divergence count as well as the verdict: piping to tail -1
+      # left only a detector line, discarding the stability check that every
+      # batch in this project is supposed to report.
+      bash "$EXPDIR/run_rel.sh" "og_${tag}_${AXIS}${m}_${r}" "$bx" "$by" \
+        "$OUTDIR" 0.0 0.0 2>&1 \
         | grep -E 'INSTABILITY|trial .* ->' | tail -2
     done
   done

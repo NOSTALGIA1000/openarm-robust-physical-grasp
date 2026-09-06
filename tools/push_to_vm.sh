@@ -33,9 +33,12 @@ ssh -p "$PORT" "$VM" "chmod +x ~/$EXPDIR_REMOTE/*.sh"
 
 echo "workspace sources -> ~/$WS"
 cd "$ROOT/vm_sync/ros2_course_physics/src"
-find . -name '*.py' -o -name '*.xml' -o -name '*.yaml' -o -name '*.urdf' -o -name '*.srdf' | while read -r rel; do
+# ssh inside a while-read loop consumes the loop's stdin unless given -n, so
+# the first iteration swallowed the remaining file list and only one file was
+# ever uploaded.
+find . \( -name '*.py' -o -name '*.xml' -o -name '*.yaml' -o -name '*.urdf' -o -name '*.srdf' \) | while read -r rel; do
   rel="${rel#./}"
-  ssh -p "$PORT" "$VM" "test -e ~/$WS/$rel" || { echo "  skip (not on VM): $rel"; continue; }
+  ssh -n -p "$PORT" "$VM" "test -e ~/$WS/$rel" || { echo "  skip (not on VM): $rel"; continue; }
   send "$rel" "~/$WS/$rel"
 done
 

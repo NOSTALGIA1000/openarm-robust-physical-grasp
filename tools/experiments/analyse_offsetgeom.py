@@ -35,7 +35,7 @@ def load(batch_dir, depth_min):
                   "record_measurement existed?" % rec.get("trial_id"),
                   file=sys.stderr)
             continue
-        parts = rec["trial_id"].split("_")          # og_<scheme>_x<bias>_<rep>
+        parts = rec["trial_id"].split("_")   # og_<scheme>_<axis><bias>_<rep>
         key = (parts[1], int(parts[2][1:]))
         bucket = kept if m.get("grip_cam_z", 0.0) >= depth_min else dropped
         bucket.setdefault(key, []).append(m)
