@@ -30,10 +30,12 @@ def load(batch_dir, depth_min):
     for path in sorted(pathlib.Path(batch_dir).glob("*/trial.json")):
         rec = json.loads(path.read_text())
         m = rec.get("measurements") or {}
-        if not m:
-            print("no measurements in %s - was it run before "
-                  "record_measurement existed?" % rec.get("trial_id"),
-                  file=sys.stderr)
+        # Not "is the dict empty": the seed is recorded early, so a trial that
+        # fails before the correction still carries a measurements block. Ask
+        # for the reading itself.
+        if "grip_cam_z" not in m:
+            print("no optical reading in %s (%s)" % (
+                rec.get("trial_id"), rec.get("category")), file=sys.stderr)
             continue
         parts = rec["trial_id"].split("_")   # og_<scheme>_<axis><bias>_<rep>
         key = (parts[1], int(parts[2][1:]))

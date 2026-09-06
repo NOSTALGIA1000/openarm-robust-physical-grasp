@@ -52,6 +52,11 @@ case "${1:-both}" in
   fixed)   run_scheme fix 30 ;;
   cascade) run_scheme cas 90,55,30 ;;
   both)    run_scheme fix 30; run_scheme cas 90,55,30 ;;
-  *) echo "usage: $0 [fixed|cascade|both]"; exit 2 ;;
+  # A window schedule of your own, e.g. WINDOWS=240,120,55,30 for a first pass
+  # wide enough that it need not be aimed by the extrinsic at all - the point
+  # being that the standard cascade still anchors its first pass on the biased
+  # projection and so inherits the error it is meant to survive.
+  custom)  run_scheme "${TAG:-cus}" "${WINDOWS:?set WINDOWS, e.g. 240,120,55,30}" ;;
+  *) echo "usage: $0 [fixed|cascade|both|custom]"; exit 2 ;;
 esac
 echo OFFSETGEOM_DONE

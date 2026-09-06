@@ -1,0 +1,2 @@
+sim_time,stage,left_contact,right_contact,left_force,right_force,object_x,object_y,object_z,object_qw,object_qx,object_qy,object_qz,gripper_x,gripper_y,gripper_z,elevation,drift
+30.05999999999422,startup,False,False,0.0,0.0,0.29999047880332513,2.8990070383184377e-07,0.4419771333576445,0.9999999999622061,6.094370043409061e-06,-5.92859128967538e-06,-1.8157679813567998e-06,7.159680776394222e-06,0.15349418535035406,0.16189955011450657,0.0,0.0
