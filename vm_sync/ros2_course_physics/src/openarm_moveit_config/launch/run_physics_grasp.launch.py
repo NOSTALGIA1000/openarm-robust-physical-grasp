@@ -110,15 +110,22 @@ def generate_launch_description():
     # behaviour and every earlier experiment ran with it.
     detector_unlatched = os.environ.get("DETECTOR_UNLATCHED", "0") == "1"
     detector_cam_frame = os.environ.get("DETECTOR_CAM_FRAME", "0") == "1"
-    node_detector = ExecuteProcess(
-        cmd=["python3", detector_script, "--ros-args",
-             "-p", "use_sim_time:=true",
-             "-p", "lock_first_detection:={}".format(
-                 "false" if detector_unlatched else "true"),
-             "-p", "publish_camera_frame:={}".format(
-                 "true" if detector_cam_frame else "false")],
-        output="screen",
-    )
+    detector_cmd = [
+        "python3", detector_script, "--ros-args",
+        "-p", "use_sim_time:=true",
+        "-p", "lock_first_detection:={}".format(
+            "false" if detector_unlatched else "true"),
+        "-p", "publish_camera_frame:={}".format(
+            "true" if detector_cam_frame else "false"),
+    ]
+    # The window schedule has to be settable per launch: deciding whether
+    # rel_offset tracks the viewing angle needs the same trials run with the
+    # converging cascade and with a single fixed window, and "30" alone gives
+    # one pass at the TF-projected centre, which is the fixed-ROI behaviour.
+    roi_cascade = os.environ.get("DETECTOR_ROI_CASCADE", "").strip()
+    if roi_cascade:
+        detector_cmd += ["-p", "roi_cascade:=[{}]".format(roi_cascade)]
+    node_detector = ExecuteProcess(cmd=detector_cmd, output="screen")
 
     spawn_table = ExecuteProcess(
         cmd=["python3", table_script, "--ros-args", "-p", "use_sim_time:=true"],
