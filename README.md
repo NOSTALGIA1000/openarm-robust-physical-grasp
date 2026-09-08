@@ -46,10 +46,10 @@ python3 -m pytest tests -q
 6. **可达区**（左臂）：y ≥ 0 半平面，x ∈ [0.25, 0.38]。
 7. **精度与上限互不相干。** 残差在 ±15 mm 内由自定心被动吸收；把残差压到 ±2 mm 不改变成功率。
 8. **朴素的抓取前重探测有害**（残差放大 2–3 倍），**修正目标 ≠ 修正路径**（须回到 hover 再下降）。
+9. **与 ECL 迭代伺服基线的对比已完成**（`stage44_baseline`，72 次成对，零发散）。单次修正在成功率上**每格都不劣**：0/128/256 mm 处 11/11、11/12、9/12，伺服为 9/12、5/9、2/11。**伺服精度更好**（残差 ±1 mm vs 最差 13 mm）却**成功率更差**——它每次迭代都要重取一次读数，而读数是间歇的（超时 3/3/8 vs 0/0/1），且需约 **12 次**手臂移动而非 1 次。**这是「反复测量」结构在间歇传感器下的代价，不是伺服算法的失败。**
 
 **尚未确立（论文/专利前必须补）：**
 
-- **零条与已知方法的对比实验**——ECL/IBVS 基线未实现，是最大缺口；
 - **零次真机验证**；
 - 单一 30×30×44 mm 立方体、单左臂、y ≥ 0 半平面；
 - `rel_offset` 为拟合常数，非由几何推导；
@@ -127,7 +127,7 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
+结论文档：[ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
 
 前身阶段（**离线 MuJoCo 框架，装置与任务均与现行 ROS2 流程不同，结论不可直接迁移**）：[接触鲁棒性网格](docs/results/2026-08-12-contact-robustness-grid.md)（630 次配对种子，**全仓库唯一带 Wilson 置信区间的批次**，其自带的「Supported / Unsupported Claims」分节是本项目措辞规范的来源） · [逐步接触冒烟](docs/results/2026-08-13-per-step-contact-smoke.md) · [稳定性筛查](docs/results/2026-08-22-simulation-grasp-stability.md)（**唯一记录了环境块与场景 SHA-256 的批次**） · [接触形成诊断](docs/results/2026-09-01-openarm-contact-formation-diagnostics.md) · [接触面几何诊断](docs/results/2026-09-01-openarm-contact-surface-geometry-diagnosis.md)
 
@@ -139,12 +139,11 @@ python3 -m pytest tests -q
 
 按价值排序。前两项是论文/专利级的硬缺口。
 
-1. **实现 ECL / IBVS 迭代伺服基线。** 文献定位表明本方案的机制就是 ECL（Hutchinson 1996），而仓库里**零条与已知方法的对比**。没有这个基线，「单次修正达到伺服效果而不需雅可比」这一主张无从支撑。复用现成的 `/apple_location_cam` 与 `/gripper_location_cam`，探测器无需改动。
-2. **真机验证。** 视场结论给出一个**可事先计算的靶子**：量真实相机的 `cy`、`fy` 与站高，算出 `cy·z/fy`，上机看悬崖是否落在那里。这比「仿真里跑通」硬得多。
-3. **消融与统计补测**：去 re-hover、去 ROI、去 `rel_offset` 各 n≥20，报 Wilson 区间。目前唯一的消融是 n=2。样本量依据见 `docs/statistics.md`。
-4. **多物体**：至少 3 种尺寸 + 1 种非立方体。现有全部试验都是同一个 30×30×44 mm 立方体。
-5. **右臂覆盖 y < 0**，验证双臂互补能否覆盖整张桌面。
-6. **LICENSE**：上游资产许可未逐项确认，**公开代码前必须解决**。
+1. **真机验证。** 视场结论给出一个**可事先计算的靶子**：量真实相机的 `cy`、`fy` 与站高，算出 `cy·z/fy`，上机看悬崖是否落在那里。这比「仿真里跑通」硬得多。
+2. **消融与统计补测**：去 re-hover、去 ROI、去 `rel_offset` 各 n≥20，报 Wilson 区间。目前唯一的消融是 n=2。样本量依据见 `docs/statistics.md`。
+3. **多物体**：至少 3 种尺寸 + 1 种非立方体。现有全部试验都是同一个 30×30×44 mm 立方体。
+4. **右臂覆盖 y < 0**，验证双臂互补能否覆盖整张桌面。
+5. **LICENSE**：上游资产许可未逐项确认，**公开代码前必须解决**。
 
 仍然开放但优先级较低：
 
