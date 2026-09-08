@@ -62,3 +62,70 @@ def shrink_radially(point: Vec3, gain: float) -> Vec3:
     sin_theta = lateral / math.hypot(lateral, z)
     scale = max(0.0, (lateral - gain * sin_theta) / lateral)
     return (x * scale, y * scale, z)
+
+
+Mat2 = Tuple[Tuple[float, float], Tuple[float, float]]
+
+
+def jacobian_from_probes(dp_a: Tuple[float, float], de_a: Tuple[float, float],
+                         dp_b: Tuple[float, float], de_b: Tuple[float, float]) -> Mat2:
+    """Image Jacobian from two deliberate probe motions.
+
+    This is what makes a baseline honestly uncalibrated: the mapping from world
+    motion to what the camera sees is measured by moving and looking, never
+    read off an extrinsic. Two probes along independent directions give the two
+    columns.
+
+    dp_* are world (x, y) displacements, de_* the camera-frame (x, y) changes
+    they produced. Returns J with de = J . dp.
+    """
+    (ax, ay), (bx, by) = dp_a, dp_b
+    det = ax * by - ay * bx
+    if abs(det) < 1e-12:
+        raise ValueError("probe directions are parallel")
+    # Columns of J solve [de_a de_b] = J [dp_a dp_b]; invert the 2x2 of probes.
+    i00, i01 = by / det, -bx / det
+    i10, i11 = -ay / det, ax / det
+    return (
+        (de_a[0] * i00 + de_b[0] * i10, de_a[0] * i01 + de_b[0] * i11),
+        (de_a[1] * i00 + de_b[1] * i10, de_a[1] * i01 + de_b[1] * i11),
+    )
+
+
+def broyden_update(jac: Mat2, dp: Tuple[float, float],
+                   de: Tuple[float, float]) -> Mat2:
+    """Rank-one correction of the Jacobian from one observed move.
+
+    Keeps the estimate current as the arm changes configuration, without
+    spending further probe motions on it.
+    """
+    dpn = dp[0] * dp[0] + dp[1] * dp[1]
+    if dpn < 1e-12:
+        return jac
+    pred = (jac[0][0] * dp[0] + jac[0][1] * dp[1],
+            jac[1][0] * dp[0] + jac[1][1] * dp[1])
+    r = (de[0] - pred[0], de[1] - pred[1])
+    return (
+        (jac[0][0] + r[0] * dp[0] / dpn, jac[0][1] + r[0] * dp[1] / dpn),
+        (jac[1][0] + r[1] * dp[0] / dpn, jac[1][1] + r[1] * dp[1] / dpn),
+    )
+
+
+def servo_step(jac: Mat2, err: Tuple[float, float], gain: float,
+               max_step: float) -> Tuple[float, float]:
+    """World displacement that should cancel `gain` of the image-space error.
+
+    Solves J . dp = gain * err. The step is clipped so a poor Jacobian early in
+    the loop cannot throw the arm across the table.
+    """
+    (a, b), (c, d) = jac
+    det = a * d - b * c
+    if abs(det) < 1e-12:
+        raise ValueError("Jacobian estimate is singular")
+    ex, ey = gain * err[0], gain * err[1]
+    dx = (d * ex - b * ey) / det
+    dy = (-c * ex + a * ey) / det
+    mag = math.hypot(dx, dy)
+    if mag > max_step > 0.0:
+        dx, dy = dx * max_step / mag, dy * max_step / mag
+    return dx, dy

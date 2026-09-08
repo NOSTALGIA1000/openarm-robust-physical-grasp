@@ -1,6 +1,6 @@
 import math
 
-from openarm_grasp_physics.geometry import distance, elevation, relative_position, shrink_radially
+from openarm_grasp_physics.geometry import distance, elevation, relative_position, shrink_radially, jacobian_from_probes, broyden_update, servo_step
 
 IDENTITY = (1.0, 0.0, 0.0, 0.0)
 YAW_90 = (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5))
@@ -79,3 +79,54 @@ def test_radial_shrink_never_crosses_the_axis():
 def test_radial_shrink_of_a_near_axis_reading_stays_small():
     x, _, _ = shrink_radially((0.001, 0.0, 0.68), 0.05)
     assert 0.0 < x < 0.001
+
+
+def test_jacobian_recovers_a_known_mapping():
+    # The scene's own mapping: world x to camera x, world y flipped.
+    true = ((1.0, 0.0), (0.0, -1.0))
+    apply = lambda dp: (true[0][0] * dp[0] + true[0][1] * dp[1],
+                        true[1][0] * dp[0] + true[1][1] * dp[1])
+    a, b = (0.02, 0.0), (0.0, 0.02)
+    jac = jacobian_from_probes(a, apply(a), b, apply(b))
+    for i in range(2):
+        for j in range(2):
+            assert abs(jac[i][j] - true[i][j]) < 1e-9
+
+
+def test_parallel_probes_are_refused():
+    import pytest
+    with pytest.raises(ValueError):
+        jacobian_from_probes((0.02, 0.0), (0.02, 0.0),
+                             (0.04, 0.0), (0.04, 0.0))
+
+
+def test_broyden_absorbs_an_observation_it_mispredicted():
+    jac = ((1.0, 0.0), (0.0, 1.0))
+    dp, de = (0.02, 0.0), (0.03, 0.0)          #真实增益是 1.5，不是 1
+    updated = broyden_update(jac, dp, de)
+    assert abs(updated[0][0] - 1.5) < 1e-9
+    assert abs(updated[1][1] - 1.0) < 1e-9     # 未被探测的方向不动
+
+
+def test_broyden_ignores_a_zero_move():
+    jac = ((1.0, 0.0), (0.0, 1.0))
+    assert broyden_update(jac, (0.0, 0.0), (0.01, 0.01)) == jac
+
+
+def test_servo_step_cancels_the_error_under_a_perfect_jacobian():
+    jac = ((1.0, 0.0), (0.0, -1.0))
+    dx, dy = servo_step(jac, (0.010, -0.006), gain=1.0, max_step=1.0)
+    assert abs(dx - 0.010) < 1e-9
+    assert abs(dy - 0.006) < 1e-9
+
+
+def test_servo_step_is_clipped():
+    jac = ((1.0, 0.0), (0.0, 1.0))
+    dx, dy = servo_step(jac, (1.0, 0.0), gain=1.0, max_step=0.05)
+    assert abs(math.hypot(dx, dy) - 0.05) < 1e-9
+
+
+def test_singular_jacobian_is_refused():
+    import pytest
+    with pytest.raises(ValueError):
+        servo_step(((1.0, 2.0), (2.0, 4.0)), (0.01, 0.01), 1.0, 0.05)

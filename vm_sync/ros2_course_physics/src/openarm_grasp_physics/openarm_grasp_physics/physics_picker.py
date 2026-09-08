@@ -43,7 +43,8 @@ from openarm_grasp_physics.evaluation import (
     TrialObservations,
     classify_trial,
 )
-from openarm_grasp_physics.geometry import shrink_radially, distance, elevation, relative_position
+from openarm_grasp_physics.geometry import (broyden_update,
+    jacobian_from_probes, servo_step, shrink_radially, distance, elevation, relative_position)
 from openarm_grasp_physics.trial_record import Sample, TrialRecorder, trial_seed
 
 GROUP = "left_arm"
@@ -79,6 +80,12 @@ class PhysicsPicker(Node):
         self.declare_parameter("measure_samples", 1)
         self.declare_parameter("view_gain_gripper", 0.0)
         self.declare_parameter("view_gain_object", 0.0)
+        self.declare_parameter("servo_baseline", False)
+        self.declare_parameter("servo_max_iters", 6)
+        self.declare_parameter("servo_gain", 0.7)
+        self.declare_parameter("servo_tol_m", 0.004)
+        self.declare_parameter("servo_probe_m", 0.02)
+        self.declare_parameter("servo_max_step_m", 0.08)
         self.declare_parameter(
             "output_dir", "/home/nostalgia/ros2_ws_course_repro/results/physics_grasp"
         )
@@ -107,12 +114,19 @@ class PhysicsPicker(Node):
             measure_samples=self.get_parameter("measure_samples").value,
             view_gain_gripper=self.get_parameter("view_gain_gripper").value,
             view_gain_object=self.get_parameter("view_gain_object").value,
+            servo_baseline=self.get_parameter("servo_baseline").value,
+            servo_max_iters=self.get_parameter("servo_max_iters").value,
+            servo_gain=self.get_parameter("servo_gain").value,
+            servo_tol_m=self.get_parameter("servo_tol_m").value,
+            servo_probe_m=self.get_parameter("servo_probe_m").value,
+            servo_max_step_m=self.get_parameter("servo_max_step_m").value,
         )
         self.trial_id = self.get_parameter("trial_id").value
         self.output_dir = self.get_parameter("output_dir").value
         self.recorder = TrialRecorder(self.output_dir, self.trial_id, self.config)
 
         self._lock = threading.Lock()
+        self._servo_hover_z = 0.0
         self._latest = None            # last GraspRawState
         self._stage = "startup"
         self._baseline_z = None
@@ -188,6 +202,113 @@ class PhysicsPicker(Node):
         with self._lock:
             self._grip_cam = (msg.x, msg.y, msg.z)
             self._cam_seq += 1
+
+    def _publish_gripper_hint(self, hover_z, ticks=12):
+        """Point the detector at the hand rather than a higher arm segment.
+
+        A selection aid only: the position the detector publishes stays purely
+        optical, so this does not smuggle the extrinsic into either scheme.
+        Both the one-shot correction and the servo baseline use it, so the
+        comparison is between control laws and not between front ends.
+        """
+        hint = Float64()
+        hint.data = float(hover_z)
+        for _ in range(ticks):
+            self.hint_pub.publish(hint)
+            with self._lock:
+                gp = self._latest.gripper_pose.position
+                ph = Point(x=gp.x, y=gp.y, z=gp.z)
+            self.point_hint_pub.publish(ph)
+            time.sleep(0.1)
+
+    def _servo_error(self):
+        """Camera-frame lateral error between object and gripper, or None.
+
+        The detector returns metric coordinates recovered from depth, and
+        camera_optical to world is a pure rotation, so equal camera x and y
+        means equal world x and y. No extrinsic translation enters here, which
+        is what keeps the baseline uncalibrated.
+        """
+        self._publish_gripper_hint(self._servo_hover_z, ticks=6)
+        obj_cam, grip_cam = self._wait_relative_pair(
+            self.config.redetect_timeout_s, samples=1)
+        if obj_cam is None:
+            return None
+        return (obj_cam[0] - grip_cam[0], obj_cam[1] - grip_cam[1])
+
+    def _run_servo(self, x, y, hover_z, quat):
+        """Iterative image-space servo with an on-line Jacobian estimate.
+
+        Returns (x, y, info) with the pose the loop settled on, or (None, None,
+        info) if a move or a reading failed. `info` records what it cost, which
+        is the point of the comparison: probe motions, iterations, and the
+        error trace.
+        """
+        info = {"servo_probes": 0, "servo_iters": 0, "servo_converged": 0.0}
+        probe = self.config.servo_probe_m
+        self._servo_hover_z = hover_z
+
+        err0 = self._servo_error()
+        if err0 is None:
+            return None, None, info
+        info["servo_err_initial"] = math.hypot(*err0)
+
+        # Two probe motions along independent directions give the Jacobian's
+        # columns. Spending real moves on this is the honest cost of not
+        # knowing the extrinsic.
+        if not self.move_to(x + probe, y, hover_z, quat, tolerance=0.005):
+            return None, None, info
+        err1 = self._servo_error()
+        if err1 is None:
+            return None, None, info
+        if not self.move_to(x + probe, y + probe, hover_z, quat, tolerance=0.005):
+            return None, None, info
+        err2 = self._servo_error()
+        if err2 is None:
+            return None, None, info
+        info["servo_probes"] = 2
+
+        try:
+            jac = jacobian_from_probes(
+                (probe, 0.0), (err1[0] - err0[0], err1[1] - err0[1]),
+                (0.0, probe), (err2[0] - err1[0], err2[1] - err1[1]))
+        except ValueError as exc:
+            self.get_logger().error("servo: %s" % exc)
+            return None, None, info
+
+        cx, cy = x + probe, y + probe
+        err = err2
+        for step in range(int(self.config.servo_max_iters)):
+            if math.hypot(*err) <= self.config.servo_tol_m:
+                info["servo_converged"] = 1.0
+                break
+            try:
+                # servo_step solves J.dp = gain*arg, so pass the negated error
+                # to drive it down rather than up.
+                dp = servo_step(jac, (-err[0], -err[1]), self.config.servo_gain,
+                                self.config.servo_max_step_m)
+            except ValueError as exc:
+                self.get_logger().error("servo: %s" % exc)
+                break
+            nx, ny = cx + dp[0], cy + dp[1]
+            if not self.move_to(nx, ny, hover_z, quat, tolerance=0.005):
+                return None, None, info
+            new_err = self._servo_error()
+            if new_err is None:
+                return None, None, info
+            jac = broyden_update(jac, dp,
+                                 (new_err[0] - err[0], new_err[1] - err[1]))
+            cx, cy, err = nx, ny, new_err
+            info["servo_iters"] = step + 1
+            self.get_logger().info(
+                "servo iter %d: |e|=%.4f at (%.4f, %.4f)"
+                % (step + 1, math.hypot(*err), cx, cy))
+        else:
+            if math.hypot(*err) <= self.config.servo_tol_m:
+                info["servo_converged"] = 1.0
+
+        info["servo_err_final"] = math.hypot(*err)
+        return cx, cy, info
 
     def _wait_relative_pair(self, timeout_s, samples=6):
         """Collect `samples` gripper readings and keep the deepest one.
@@ -586,6 +707,40 @@ class PhysicsPicker(Node):
                             lock_branch=True):
             planning_ok = False
             return self._finish(planning_ok, gripper_ok, timed_out)
+
+        if self.config.servo_baseline and self.config.relative_correction:
+            # Running both would let the servo settle the pose and the one-shot
+            # correction then overwrite it, producing a number belonging to
+            # neither scheme. This project has twice published a figure from a
+            # configuration that was not the one it claimed to be measuring.
+            self.get_logger().error(
+                "servo_baseline and relative_correction are mutually "
+                "exclusive; refusing to run a hybrid of the two")
+            return self._finish(False, gripper_ok, timed_out)
+
+        if self.config.servo_baseline:
+            sx, sy, servo_info = self._run_servo(x, y, hover_z, quat)
+            self.recorder.record_measurement(**servo_info)
+            if sx is None:
+                self.get_logger().error(
+                    "servo baseline did not complete; probes=%d iters=%d"
+                    % (servo_info["servo_probes"], servo_info["servo_iters"]))
+                return self._finish(planning_ok, gripper_ok, True,
+                                    detector_ok=False)
+            self.get_logger().info(
+                "servo baseline -> x=%.4f y=%.4f after %d probes and %d "
+                "iterations (|e| %.4f -> %.4f, converged=%d); ground truth "
+                "x=%.4f y=%.4f, residual x%+.4f y%+.4f"
+                % (sx, sy, servo_info["servo_probes"], servo_info["servo_iters"],
+                   servo_info.get("servo_err_initial", float("nan")),
+                   servo_info.get("servo_err_final", float("nan")),
+                   int(servo_info["servo_converged"]), gt_x, gt_y,
+                   sx - gt_x, sy - gt_y))
+            self.recorder.record_measurement(
+                target_x=sx, target_y=sy,
+                ground_truth_x=gt_x, ground_truth_y=gt_y,
+                residual_x=sx - gt_x, residual_y=sy - gt_y)
+            x, y = sx, sy
 
         if self.config.relative_correction:
             # Tell the detector where the hand is so it can pick the hand's blob

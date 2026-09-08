@@ -46,10 +46,15 @@ for c in joint_state_broadcaster left_arm_controller left_hand_controller; do
 done
 timeout 400 ros2 run openarm_grasp_physics physics_picker --ros-args \
   -p use_sim_time:=true -p trial_id:="$TRIAL" -p output_dir:="$OUT" \
-  -p use_detector_target:=true -p relative_correction:=true \
+  -p use_detector_target:=true -p relative_correction:="${RELATIVE_CORRECTION:-true}" \
   -p rel_offset_x:="$OFFX" -p rel_offset_y:="$OFFY" \
   -p view_gain_gripper:="${VIEW_GAIN_GRIPPER:-0.0}" \
   -p view_gain_object:="${VIEW_GAIN_OBJECT:-0.0}" \
+  -p servo_baseline:="${SERVO_BASELINE:-false}" \
+  -p servo_max_iters:="${SERVO_MAX_ITERS:-6}" \
+  -p servo_gain:="${SERVO_GAIN:-0.7}" \
+  -p servo_tol_m:="${SERVO_TOL_M:-0.004}" \
+  -p servo_probe_m:="${SERVO_PROBE_M:-0.02}" \
   > "$PICKERLOG" 2>&1
 echo "INSTABILITY=$(grep -c 'unstable\|QACC' "$LOG")"
 grep -E 'relative correction|trial .* ->' "$PICKERLOG" | tail -3

@@ -105,6 +105,24 @@ class GraspConfig:
     view_gain_gripper: float = 0.0
     view_gain_object: float = 0.0
 
+    # Endpoint closed-loop baseline: iterative image-space servoing with the
+    # Jacobian estimated on line, which is the classical way this problem is
+    # solved (Hutchinson/Hager/Corke 1996 for the taxonomy, Hosoda & Asada 1994
+    # and Piepmeier 1999 for the estimation, Horaud/Dornaika/Espiau 1998 for
+    # grasping by alignment). It exists so the one-shot scheme has something to
+    # be compared against: both read the same two optical measurements, and
+    # neither touches the extrinsic, but this one spends probe motions to learn
+    # the mapping and then iterates, where the other adds the difference to
+    # forward kinematics once.
+    #
+    # Mutually exclusive with relative_correction.
+    servo_baseline: bool = False
+    servo_max_iters: int = 6
+    servo_gain: float = 0.7
+    servo_tol_m: float = 0.004
+    servo_probe_m: float = 0.02
+    servo_max_step_m: float = 0.08
+
     # Relative (differential) visual correction. Measures object and gripper
     # optically in the camera frame and adds their difference to the gripper
     # pose known from kinematics:

@@ -34,3 +34,23 @@ def test_snapshot_is_a_plain_dict_for_trial_records():
 
     assert isinstance(snapshot, dict)
     assert snapshot["lift_height_m"] == 0.020
+
+
+def test_servo_baseline_is_off_by_default():
+    config = GraspConfig()
+
+    assert config.servo_baseline is False
+    assert config.relative_correction is False
+
+
+def test_servo_defaults_are_a_usable_loop():
+    config = GraspConfig()
+
+    # A tolerance under the open-loop cliff, a gain that converges rather than
+    # oscillates, and a probe long enough to move the reading measurably
+    # against the detector's own noise of about 2mm.
+    assert 0.0 < config.servo_tol_m < 0.024
+    assert 0.0 < config.servo_gain <= 1.0
+    assert config.servo_probe_m > 0.004
+    assert config.servo_max_iters >= 3
+    assert config.servo_max_step_m > config.servo_probe_m
