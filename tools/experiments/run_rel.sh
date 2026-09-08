@@ -11,9 +11,15 @@ export DETECTOR_UNLATCHED=1
 export DETECTOR_CAM_FRAME=1
 source "$ROS_SETUP"
 source "$OPENARM_INSTALL/setup.bash"
-LOG="/tmp/physics_launch_${TRIAL}.log"
 OUT="$OPENARM_RESULTS/$OUTDIR"
-mkdir -p "$OUT"
+# Logs live with the trial they belong to, not in /tmp. Everything written to
+# /tmp is lost on the next reboot, and the per-trial detector traces and picker
+# reasoning for three completed batches went that way before anyone noticed -
+# the trial records survived because they were always written here.
+TRIALDIR="$OUT/$TRIAL"
+mkdir -p "$TRIALDIR"
+LOG="$TRIALDIR/launch.log"
+PICKERLOG="$TRIALDIR/picker.log"
 bash "$EXPDIR/preflight.sh" 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
 setsid nohup ros2 launch openarm_moveit_config run_physics_grasp.launch.py viewer_render_period:=1.0 > "$LOG" 2>&1 < /dev/null &
 for i in $(seq 1 120); do grep -q 'Successfully loaded controller' "$LOG" 2>/dev/null && break; sleep 3; done
@@ -44,7 +50,10 @@ timeout 400 ros2 run openarm_grasp_physics physics_picker --ros-args \
   -p rel_offset_x:="$OFFX" -p rel_offset_y:="$OFFY" \
   -p view_gain_gripper:="${VIEW_GAIN_GRIPPER:-0.0}" \
   -p view_gain_object:="${VIEW_GAIN_OBJECT:-0.0}" \
-  > "/tmp/picker_${TRIAL}.log" 2>&1
+  > "$PICKERLOG" 2>&1
 echo "INSTABILITY=$(grep -c 'unstable\|QACC' "$LOG")"
-grep -E 'relative correction|trial .* ->' "/tmp/picker_${TRIAL}.log" | tail -3
+grep -E 'relative correction|trial .* ->' "$PICKERLOG" | tail -3
 grep -m3 'blobs:' "$LOG" | tail -2
+# Compress once the greps above have run: a launch log is about 76KB raw and
+# under 10KB gzipped, so a full batch costs well under a megabyte to keep.
+gzip -f "$LOG" "$PICKERLOG" 2>/dev/null || true
