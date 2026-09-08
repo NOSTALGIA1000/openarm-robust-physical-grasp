@@ -25,12 +25,21 @@ REPEATS="${REPEATS:-12}"
 BIASES="${BIASES:-240 288 320}"
 OUTDIR="${OUTDIR:-stage40_ceiling}"
 GAIN="${GAIN:-0.0478}"
+# The window schedule. Every pass is clipped to the frame, so a first radius of
+# 400 covers the whole 640x480 image from any centre - which is how a search
+# that does not depend on the extrinsic at all can be run without touching the
+# detector. At 320mm of bias the projected centre is about 280px from the
+# gripper, past even a 240px window, so the standard 90px first pass cannot
+# contain it and every trial there timed out.
+WINDOWS="${WINDOWS:-90,55,30}"
+ARMTAG="${ARMTAG:-}"
 
 run_arm() {
   local tag="$1" gain="$2" offx="$3" offy="$4" m v r
   export VIEW_GAIN_GRIPPER="$gain" VIEW_GAIN_OBJECT="$gain"
-  export DETECTOR_ROI_CASCADE="90,55,30"
-  echo "=== $tag (gain=$gain, rel_offset=$offx,$offy) ==="
+  export DETECTOR_ROI_CASCADE="$WINDOWS"
+  tag="${ARMTAG:-$tag}"
+  echo "=== $tag (gain=$gain, rel_offset=$offx,$offy, windows=$WINDOWS) ==="
   for m in $BIASES; do
     v=$(echo "scale=4; $m/1000" | bc)
     for r in $(seq 1 "$REPEATS"); do

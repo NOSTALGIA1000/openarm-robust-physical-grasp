@@ -125,6 +125,11 @@ def generate_launch_description():
     roi_cascade = os.environ.get("DETECTOR_ROI_CASCADE", "").strip()
     if roi_cascade:
         detector_cmd += ["-p", "roi_cascade:=[{}]".format(roi_cascade)]
+    # Has to be set together with a scene whose camera carries the same value;
+    # PHYSICS_SCENE selects that scene.
+    fovy = os.environ.get("DETECTOR_FOVY", "").strip()
+    if fovy:
+        detector_cmd += ["-p", "fovy_deg:={}".format(float(fovy))]
     node_detector = ExecuteProcess(cmd=detector_cmd, output="screen")
 
     spawn_table = ExecuteProcess(

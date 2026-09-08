@@ -19,8 +19,11 @@ class UniversalDetector(Node):
         # 相机内参 (保持不变)
         self.width = 640
         self.height = 480
-        # self.fovy_deg = 60.0
-        self.fovy_deg = 45.0
+        # Must match the scene camera: the unprojection scales every lateral
+        # measurement by 1/tan(fovy/2), so a mismatch shows up as a
+        # proportional error that grows with distance from the optical axis.
+        self.declare_parameter('fovy_deg', 45.0)
+        self.fovy_deg = float(self.get_parameter('fovy_deg').value)
         self.fy = (self.height / 2.0) / math.tan(math.radians(self.fovy_deg / 2.0))
         self.fx = self.fy 
         self.cx = self.width / 2.0
