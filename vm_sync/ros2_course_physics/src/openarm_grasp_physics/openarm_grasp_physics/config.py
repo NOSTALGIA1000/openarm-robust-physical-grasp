@@ -33,6 +33,12 @@ class GraspConfig:
     # residual inside +/-15mm gets absorbed as the jaws close, which is why
     # cutting the residual from 12mm to 2mm changed no success rate.
     open_position: float = 0.030
+    # Commanded finger position when closing, so the closed gap is twice it.
+    # Against a 30mm object that is 12mm of gap, i.e. 18mm of squeeze - the
+    # quantity the contact force follows. It has to scale with the object or
+    # grip force gets confounded with clearance: the lab's 50mm cubes would
+    # otherwise be squeezed 38mm instead of 18mm. (side - 0.018) / 2 keeps the
+    # squeeze fixed and reproduces this value at 30mm.
     close_position: float = 0.006
     open_tolerance: float = 0.005
 

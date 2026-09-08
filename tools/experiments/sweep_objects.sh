@@ -37,7 +37,7 @@ for s in $SIDES; do
   cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
   export PHYSICS_SCENE="$scene"
   # s/2 + 5.5mm, the detector's own top-surface offset measured on the cuboid.
-  export DETECTOR_Z_BIAS=$(echo "scale=4; $s/2000 + 0.0055" | bc)
+  export DETECTOR_Z_BIAS=0$(echo "scale=4; $s/2000 + 0.0055" | bc)
   echo "=== cube ${s}mm (clearance $(( (60 - s) / 2 ))mm/side, z_bias=$DETECTOR_Z_BIAS) ==="
   for m in $BIASES; do
     v=$(echo "scale=4; $m/1000" | bc)

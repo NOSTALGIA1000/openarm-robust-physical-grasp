@@ -66,6 +66,8 @@ class PhysicsPicker(Node):
         self.declare_parameter("visual_correction", False)
         self.declare_parameter("use_detector_target", False)
         self.declare_parameter("detector_z_bias", 0.0275)
+        self.declare_parameter("open_position", 0.030)
+        self.declare_parameter("close_position", 0.006)
         self.declare_parameter("pregrasp_redetect", False)
         self.declare_parameter("relative_correction", False)
         self.declare_parameter("rel_offset_x", 0.0)
@@ -98,6 +100,8 @@ class PhysicsPicker(Node):
             visual_correction=self.get_parameter("visual_correction").value,
             use_detector_target=self.get_parameter("use_detector_target").value,
             detector_z_bias=self.get_parameter("detector_z_bias").value,
+            open_position=self.get_parameter("open_position").value,
+            close_position=self.get_parameter("close_position").value,
             pregrasp_redetect=self.get_parameter("pregrasp_redetect").value,
             relative_correction=self.get_parameter("relative_correction").value,
             rel_offset_x=self.get_parameter("rel_offset_x").value,
