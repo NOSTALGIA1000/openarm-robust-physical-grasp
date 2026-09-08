@@ -26,6 +26,12 @@ class GraspConfig:
     max_drift_m: float = 0.010
 
     # Finger joint travel in metres. 0.0 is closed, 0.06 is fully open.
+    #
+    # Each finger travels this far, so the pre-grasp gap is twice it: 60mm
+    # against a 30mm object leaves 15mm of clearance per side. That number is
+    # the self-centering budget the tolerance results keep running into - a
+    # residual inside +/-15mm gets absorbed as the jaws close, which is why
+    # cutting the residual from 12mm to 2mm changed no success rate.
     open_position: float = 0.030
     close_position: float = 0.006
     open_tolerance: float = 0.005
@@ -46,7 +52,7 @@ class GraspConfig:
 
     # MoveIt plans in joint space, so one long descend lets the TCP bow away
     # from vertical and the fingers sweep laterally through the object. That
-    # was measured to spin the cube ~12 deg about z before the gripper closed,
+    # was measured to spin the object ~12 deg about z before the gripper closed,
     # after which closing strikes its corners and cams it out. Descending in
     # short increments keeps the path near-vertical.
     descend_steps: int = 1

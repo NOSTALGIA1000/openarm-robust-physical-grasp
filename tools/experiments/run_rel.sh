@@ -50,6 +50,7 @@ timeout 400 ros2 run openarm_grasp_physics physics_picker --ros-args \
   -p rel_offset_x:="$OFFX" -p rel_offset_y:="$OFFY" \
   -p view_gain_gripper:="${VIEW_GAIN_GRIPPER:-0.0}" \
   -p view_gain_object:="${VIEW_GAIN_OBJECT:-0.0}" \
+  -p detector_z_bias:="${DETECTOR_Z_BIAS:-0.0275}" \
   -p servo_baseline:="${SERVO_BASELINE:-false}" \
   -p servo_max_iters:="${SERVO_MAX_ITERS:-6}" \
   -p servo_gain:="${SERVO_GAIN:-0.7}" \
