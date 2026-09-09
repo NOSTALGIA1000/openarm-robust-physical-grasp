@@ -54,3 +54,12 @@ def test_servo_defaults_are_a_usable_loop():
     assert config.servo_probe_m > 0.004
     assert config.servo_max_iters >= 3
     assert config.servo_max_step_m > config.servo_probe_m
+
+
+def test_lift_command_is_separate_from_the_acceptance_threshold():
+    config = GraspConfig()
+    # The command reproduces the old lift_height_m + 0.01 so past batches are
+    # unchanged, but the two can now move independently.
+    assert config.lift_command_m == 0.030
+    assert config.lift_height_m == 0.020
+    assert config.lift_command_m != config.lift_height_m

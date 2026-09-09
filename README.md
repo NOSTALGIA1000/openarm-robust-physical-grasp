@@ -46,11 +46,13 @@ python3 -m pytest tests -q
 6. **可达区**（左臂）：y ≥ 0 半平面，x ∈ [0.25, 0.38]。
 7. **精度与上限互不相干。** 残差在 ±15 mm 内由自定心被动吸收；把残差压到 ±2 mm 不改变成功率。
 8. **朴素的抓取前重探测有害**（残差放大 2–3 倍），**修正目标 ≠ 修正路径**（须回到 hover 再下降）。
-9. **与 ECL 迭代伺服基线的对比已完成**（`stage44_baseline`，72 次成对，零发散）。单次修正在成功率上**每格都不劣**：0/128/256 mm 处 11/11、11/12、9/12，伺服为 9/12、5/9、2/11。**伺服精度更好**（残差 ±1 mm vs 最差 13 mm）却**成功率更差**——它每次迭代都要重取一次读数，而读数是间歇的（超时 3/3/8 vs 0/0/1），且需约 **12 次**手臂移动而非 1 次。**这是「反复测量」结构在间歇传感器下的代价，不是伺服算法的失败。**
+9. **实验室真方块（50mm）在仿真中可靠抓取**（`stage46_clearance`，119 次有效，零发散）。最佳配置 `open_position = 0.050`（每侧余隙 25mm）在 128mm 偏置下 **12/12** [76%, 100%]。真机建议参数：`open=0.050`、`close=0.016`（保持 18mm 压缩量）、`detector_z_bias=0.0305`、`object_depth_hi=0.750`。
+10. **与 ECL 迭代伺服基线的对比已完成**（`stage44_baseline`，72 次成对，零发散）。单次修正在成功率上**每格都不劣**：0/128/256 mm 处 11/11、11/12、9/12，伺服为 9/12、5/9、2/11。**伺服精度更好**（残差 ±1 mm vs 最差 13 mm）却**成功率更差**——它每次迭代都要重取一次读数，而读数是间歇的（超时 3/3/8 vs 0/0/1），且需约 **12 次**手臂移动而非 1 次。**这是「反复测量」结构在间歇传感器下的代价，不是伺服算法的失败。**
 
 **尚未确立（论文/专利前必须补）：**
 
 - **零次真机验证**；
+- **「余隙主导」未判定**：配对检验（同余隙、不同物体）因验收判据的尺寸耦合而失效——`lift_height_m` 曾同时充当下达抬升量与验收阈值，夹爪固定升 30mm 而小方块滑移 8.5–11.5mm（50mm 仅 4.5mm），使 30mm 方块抬升均值 **19.76mm** 恰好骑在 **20.0mm** 阈值上，25 次 `insufficient_lift` 全部落在 15.5–19.95mm。已解耦（新增 `lift_command_m`），需重跑；
 - 单一 30×30×44 mm **长方体**（截面 30×30 正方形，高 44，非立方体）、单左臂、y ≥ 0 半平面；
 - `rel_offset` 为拟合常数，非由几何推导；
 - 夹爪读数的残余双峰根因未定（判据可靠：`grip_cam z` 接近预期时残差 ±2 mm，偏浅时 ±15 mm）。
@@ -127,7 +129,7 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
+结论文档：[余隙扫描与抬升耦合](docs/results/2026-09-09-openarm-clearance-and-lift-coupling.md) · [ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
 
 前身阶段（**离线 MuJoCo 框架，装置与任务均与现行 ROS2 流程不同，结论不可直接迁移**）：[接触鲁棒性网格](docs/results/2026-08-12-contact-robustness-grid.md)（630 次配对种子，**全仓库唯一带 Wilson 置信区间的批次**，其自带的「Supported / Unsupported Claims」分节是本项目措辞规范的来源） · [逐步接触冒烟](docs/results/2026-08-13-per-step-contact-smoke.md) · [稳定性筛查](docs/results/2026-08-22-simulation-grasp-stability.md)（**唯一记录了环境块与场景 SHA-256 的批次**） · [接触形成诊断](docs/results/2026-09-01-openarm-contact-formation-diagnostics.md) · [接触面几何诊断](docs/results/2026-09-01-openarm-contact-surface-geometry-diagnosis.md)
 

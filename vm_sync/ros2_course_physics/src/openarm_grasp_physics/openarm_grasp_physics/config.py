@@ -20,7 +20,17 @@ class GraspConfig:
     confirm_window_s: float = 0.30
 
     # Grasp acceptance.
+    # Acceptance threshold: how far the object must actually rise.
     lift_height_m: float = 0.020
+    # How far the gripper is commanded to rise, which is a separate question.
+    # These were one constant, so the commanded lift could not be raised
+    # without also raising the bar it was judged against. That coupling hid a
+    # size effect: at a 30mm command the object slips in the jaws, 4.5mm for a
+    # 50mm cube but 8.5 to 11.5mm for a 30mm one, so the smaller cube landed at
+    # 18.4mm mean against the same 20mm threshold and 25 of its trials were
+    # recorded as insufficient_lift - every one of them between 15.5 and
+    # 19.95mm. The default reproduces the old lift_height_m + 0.01 exactly.
+    lift_command_m: float = 0.030
     hold_duration_s: float = 2.0
     min_bilateral_ratio: float = 0.80
     max_drift_m: float = 0.010

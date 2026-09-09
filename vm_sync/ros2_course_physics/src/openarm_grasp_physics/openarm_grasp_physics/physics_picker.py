@@ -67,6 +67,7 @@ class PhysicsPicker(Node):
         self.declare_parameter("use_detector_target", False)
         self.declare_parameter("detector_z_bias", 0.0275)
         self.declare_parameter("open_position", 0.030)
+        self.declare_parameter("lift_command_m", 0.030)
         self.declare_parameter("close_position", 0.006)
         self.declare_parameter("pregrasp_redetect", False)
         self.declare_parameter("relative_correction", False)
@@ -101,6 +102,7 @@ class PhysicsPicker(Node):
             use_detector_target=self.get_parameter("use_detector_target").value,
             detector_z_bias=self.get_parameter("detector_z_bias").value,
             open_position=self.get_parameter("open_position").value,
+            lift_command_m=self.get_parameter("lift_command_m").value,
             close_position=self.get_parameter("close_position").value,
             pregrasp_redetect=self.get_parameter("pregrasp_redetect").value,
             relative_correction=self.get_parameter("relative_correction").value,
@@ -928,7 +930,7 @@ class PhysicsPicker(Node):
             self._bilateral_confirmed = True
 
         self.set_stage("lift")
-        lift_z = grasp_z + self.config.lift_height_m + 0.01
+        lift_z = grasp_z + self.config.lift_command_m
         # DIAGNOSTIC (coordinator-approved, one bounded test): 10x gentler
         # lift to test whether contact_lost_during_lift is acceleration-
         # driven (teleported-qpos arm path) or structural. Revert after.
