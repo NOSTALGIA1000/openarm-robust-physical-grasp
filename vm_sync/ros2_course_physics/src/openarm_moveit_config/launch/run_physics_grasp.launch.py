@@ -125,6 +125,11 @@ def generate_launch_description():
     roi_cascade = os.environ.get("DETECTOR_ROI_CASCADE", "").strip()
     if roi_cascade:
         detector_cmd += ["-p", "roi_cascade:=[{}]".format(roi_cascade)]
+    # The object band's far edge has to follow the object's height, or a short
+    # one falls past it and never produces a blob.
+    object_depth_hi = os.environ.get("DETECTOR_OBJECT_DEPTH_HI", "").strip()
+    if object_depth_hi:
+        detector_cmd += ["-p", "object_depth_hi:={}".format(object_depth_hi)]
     # Has to be set together with a scene whose camera carries the same value;
     # PHYSICS_SCENE selects that scene.
     fovy = os.environ.get("DETECTOR_FOVY", "").strip()

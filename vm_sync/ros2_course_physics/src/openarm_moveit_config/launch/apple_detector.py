@@ -49,6 +49,18 @@ class UniversalDetector(Node):
         # split is done on depth, not on contours.
         self.declare_parameter('publish_camera_frame', False)
         self.declare_parameter('depth_split', 0.71)
+        # Far edge of the object band, used by all three depth masks: the
+        # world-frame detection that publishes /apple_location, the
+        # camera-frame one, and the structure logger. It keeps the table out -
+        # the table surface reads 0.780 - and 0.75 was picked for the 44mm
+        # cuboid, whose top face reads 0.736.
+        #
+        # A 30mm cube's top face reads exactly 0.750 and the comparison is
+        # strict, so a probe of the depth image found 0 pixels in [split, 0.75)
+        # against 621 in [split, 0.77). Every 30mm trial timed out with no
+        # target published. Scaling as top + 0.020 gives a 50mm cube exactly
+        # the 0.750 that was hardcoded, so batches already run stay comparable.
+        self.declare_parameter('object_depth_hi', 0.75)
         # 0.09 puts the band's lower edge at 0.594, which overlaps the
         # forearm: the depth histogram shows forearm filling 0.40-0.60
         # continuously. 0.06 lifts the edge to 0.624 and excludes it.
@@ -79,6 +91,7 @@ class UniversalDetector(Node):
         self.declare_parameter('roi_offset_world_z', 0.0)
         self.publish_cam = self.get_parameter('publish_camera_frame').value
         self.depth_split = self.get_parameter('depth_split').value
+        self.object_depth_hi = self.get_parameter('object_depth_hi').value
         self.gripper_band_below = self.get_parameter('gripper_band_below').value
         self.gripper_band_above = self.get_parameter('gripper_band_above').value
         self.gripper_min_area = self.get_parameter('gripper_min_area').value
@@ -112,8 +125,8 @@ class UniversalDetector(Node):
             Point, '/gripper_point_hint', self._on_point_hint, 10)
         if self.publish_cam:
             self.get_logger().info(
-                '=== publishing camera-frame points, depth split {:.3f} m ==='
-                .format(self.depth_split))
+                '=== publishing camera-frame points, depth split {:.3f} m, object band hi {:.3f} m ==='
+                .format(self.depth_split, self.object_depth_hi))
         
         # --- 修改点1：状态变量 ---
         self.fixed_world_point = None  # 用于存储锁定的坐标
@@ -474,7 +487,8 @@ class UniversalDetector(Node):
 
     def _log_blob_structure(self, depth_img):
         """Log the depth structure so bands are set from data, not guesswork."""
-        mask = (((depth_img > 0.30) & (depth_img < 0.75)) * 255).astype(np.uint8)
+        mask = (((depth_img > 0.30) & (depth_img < self.object_depth_hi))
+                * 255).astype(np.uint8)
         contours, _ = cv2.findContours(
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         parts = []
@@ -499,7 +513,8 @@ class UniversalDetector(Node):
         their difference.
         """
         self._log_blob_structure(cv_image)
-        obj = self._blob_centroid_cam(cv_image, self.depth_split, 0.75)
+        obj = self._blob_centroid_cam(cv_image, self.depth_split,
+                                      self.object_depth_hi)
         if obj is not None:
             self.obj_cam_pub.publish(obj)
 
@@ -616,7 +631,7 @@ class UniversalDetector(Node):
                 cv_image = np.nan_to_num(cv_image, nan=10.0)
 
             # 简单的深度分割提取物体 (0.3m ~ 1.5m 范围内)
-            mask = (cv_image < 0.75) & (cv_image > 0.3)
+            mask = (cv_image < self.object_depth_hi) & (cv_image > 0.3)
             mask_uint8 = (mask * 255).astype(np.uint8)
 
             contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

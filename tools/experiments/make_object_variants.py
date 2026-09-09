@@ -25,8 +25,17 @@ import pathlib
 import re
 import sys
 
-TABLE_TOP_M = 0.425
+# Measured from the scene: table_top is a cylinder of half-height 0.02
+# at z=0.40 inside a body at the origin, so its surface is 0.420. The
+# historical object spawned 5mm above it and settled.
+TABLE_TOP_M = 0.420
 DETECTOR_SURFACE_OFFSET_M = 0.0055
+CAMERA_Z_M = 1.2
+# The object band must clear the object's own depth spread - the 44mm
+# cuboid measured 0.736 to 0.746 - without reaching the table at 0.780.
+# 20mm gives a 50mm cube exactly the 0.750 that was hardcoded, so the
+# cells already run under the old constant stay comparable.
+OBJECT_BAND_MARGIN_M = 0.020
 
 
 def main():
@@ -54,9 +63,12 @@ def main():
             text, count=1)
         name = "table_scene_c%03d.xml" % s
         (out / name).write_text(text, encoding="utf-8")
-        print("%s  cube %dmm  clearance %.1fmm/side  z_bias %.4f  origin_z %.4f" % (
-            name, s, (60 - s) / 2.0, half + DETECTOR_SURFACE_OFFSET_M,
-            TABLE_TOP_M + half))
+        top_depth = CAMERA_Z_M - (TABLE_TOP_M + s / 1000.0)
+        print("%s  cube %dmm  clearance %.1fmm/side  z_bias %.4f  origin_z %.4f  "
+              "top_depth %.4f  band_hi %.4f" % (
+                  name, s, (60 - s) / 2.0, half + DETECTOR_SURFACE_OFFSET_M,
+                  TABLE_TOP_M + half, top_depth,
+                  top_depth + OBJECT_BAND_MARGIN_M))
 
 
 if __name__ == "__main__":

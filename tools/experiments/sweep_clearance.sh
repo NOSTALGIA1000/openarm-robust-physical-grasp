@@ -46,6 +46,11 @@ for cell in $CELLS; do
   cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
   export PHYSICS_SCENE="$scene"
   export DETECTOR_Z_BIAS=0$(echo "scale=4; $s/2000 + 0.0055" | bc)
+  # Object band far edge: top depth + 20mm, clear of the table at 0.780.
+  # Hardcoded at 0.75 it excluded any cube shorter than about 45mm - every
+  # 30mm trial returned no blob. 20mm gives a 50mm cube exactly 0.750, so
+  # the cells already run under the old constant remain comparable.
+  export DETECTOR_OBJECT_DEPTH_HI=0$(echo "scale=4; 1.2 - 0.420 - $s/1000 + 0.020" | bc)
   export OPEN_POSITION="$op"
   export CLOSE_POSITION=0$(echo "scale=4; ($s/1000 - 0.018) / 2" | bc)
   clear_mm=$(echo "scale=1; ($op * 2000 - $s) / 2" | bc)
@@ -53,7 +58,7 @@ for cell in $CELLS; do
     echo "=== SKIP cube ${s}mm open ${op}: clearance ${clear_mm}mm, jaws do not fit ==="
     continue
   fi
-  echo "=== cube ${s}mm, open ${op} (clearance ${clear_mm}mm/side, close=$CLOSE_POSITION, z_bias=$DETECTOR_Z_BIAS) ==="
+  echo "=== cube ${s}mm, open ${op} (clearance ${clear_mm}mm/side, close=$CLOSE_POSITION, z_bias=$DETECTOR_Z_BIAS, band_hi=$DETECTOR_OBJECT_DEPTH_HI) ==="
   for m in $BIASES; do
     v=$(echo "scale=4; $m/1000" | bc)
     for r in $(seq 1 "$REPEATS"); do
@@ -64,5 +69,5 @@ for cell in $CELLS; do
     done
   done
 done
-unset PHYSICS_SCENE DETECTOR_Z_BIAS OPEN_POSITION CLOSE_POSITION
+unset PHYSICS_SCENE DETECTOR_Z_BIAS OPEN_POSITION CLOSE_POSITION DETECTOR_OBJECT_DEPTH_HI
 echo CLEARANCE_DONE
