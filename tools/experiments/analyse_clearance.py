@@ -36,6 +36,24 @@ def wilson(k, n, z=1.96):
     return max(0.0, c - h), min(1.0, c + h)
 
 
+def newcombe(k1, n1, k2, n2, z=1.96):
+    """95% interval for p1 - p2, Newcombe's hybrid score method.
+
+    Overlap of two separate intervals is a far weaker test than it looks: with
+    a dozen trials per cell the intervals are so wide that almost nothing fails
+    it, so "they overlap" was close to unfalsifiable. This asks the question
+    that matters instead - whether the difference itself is distinguishable
+    from zero.
+    """
+    p1, p2 = k1 / n1, k2 / n2
+    l1, u1 = wilson(k1, n1, z)
+    l2, u2 = wilson(k2, n2, z)
+    d = p1 - p2
+    lo = d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)
+    hi = d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
+    return d, lo, hi
+
+
 def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
@@ -81,23 +99,27 @@ def main():
             continue
         found = True
         print("  余隙 %.1fmm, 偏置 %dmm:" % (clearance, bias))
-        rates = []
+        counts = []
         for side, opening in sorted(members):
             k, n, lo, hi = stats[(clearance, side, opening, bias)]
             if n == 0:
                 print("    cube %2dmm open %.3f -> 无有效试验（全部流水线故障）"
                       % (side, opening))
                 continue
-            rates.append((k / n, lo, hi))
+            counts.append((side, opening, k, n))
             print("    cube %2dmm open %.3f -> %d/%d [%4.0f%%,%4.0f%%]" % (
                 side, opening, k, n, lo * 100, hi * 100))
-        if len(rates) < 2:
+        if len(counts) < 2:
             print("    -> 可比格点不足，无法判断")
             continue
-        overlap = max(r[1] for r in rates) <= min(r[2] for r in rates)
+        (s1, o1, k1, n1), (s2, o2_, k2, n2) = counts[0], counts[1]
+        d, dlo, dhi = newcombe(k1, n1, k2, n2)
+        print("    差值 (%dmm − %dmm) = %+.1f%%  95%% CI [%+.1f%%, %+.1f%%]"
+              % (s1, s2, d * 100, dlo * 100, dhi * 100))
         print("    -> %s" % (
-            "区间重叠：与「余隙主导」一致" if overlap else
-            "区间不重叠：余隙不足以解释，物体尺寸另有影响"))
+            "CI 跨 0：两种物体在同余隙下无可分辨差异，与「余隙主导」一致"
+            if dlo <= 0 <= dhi else
+            "CI 不跨 0：同余隙下仍有差异，余隙不足以解释"))
     if not found:
         print("  （本批次没有可配对的格点）")
 

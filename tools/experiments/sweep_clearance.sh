@@ -35,6 +35,12 @@ BIASES="${BIASES:-000 128}"
 OUTDIR="${OUTDIR:-stage46_clearance}"
 OFFX="${OFFX:--0.0209}"
 OFFY="${OFFY:--0.0007}"
+# Commanded gripper rise, separate from the 20mm acceptance threshold. At the
+# old 0.030 the object slipped 8.5-11.5mm in the jaws and a 30mm cube landed at
+# 18.4mm mean - every failure just under the line, while a 50mm cube reached
+# 25.5mm. The threshold was not size-neutral, which voided the paired test.
+# 0.050 puts both sizes clear of it: the 30mm cube now lifts 39.1mm.
+export LIFT_COMMAND_M="${LIFT_COMMAND_M:-0.030}"
 
 sides=$(for c in $CELLS; do echo "${c%%:*}"; done | sort -u | tr '\n' ' ')
 python3 "$EXPDIR/make_object_variants.py" \
