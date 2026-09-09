@@ -130,6 +130,14 @@ def generate_launch_description():
     object_depth_hi = os.environ.get("DETECTOR_OBJECT_DEPTH_HI", "").strip()
     if object_depth_hi:
         detector_cmd += ["-p", "object_depth_hi:={}".format(object_depth_hi)]
+    # Sensor noise on the rendered depth. MuJoCo's depth is exact; real depth
+    # is not, and every threshold in the detector was tuned on the exact kind.
+    depth_noise = os.environ.get("DETECTOR_DEPTH_NOISE_STD", "").strip()
+    if depth_noise:
+        detector_cmd += ["-p", "depth_noise_std:={}".format(depth_noise)]
+    depth_noise_seed = os.environ.get("DETECTOR_DEPTH_NOISE_SEED", "").strip()
+    if depth_noise_seed:
+        detector_cmd += ["-p", "depth_noise_seed:={}".format(depth_noise_seed)]
     # Has to be set together with a scene whose camera carries the same value;
     # PHYSICS_SCENE selects that scene.
     fovy = os.environ.get("DETECTOR_FOVY", "").strip()

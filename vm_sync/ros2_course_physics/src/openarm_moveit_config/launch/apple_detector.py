@@ -61,6 +61,15 @@ class UniversalDetector(Node):
         # target published. Scaling as top + 0.020 gives a 50mm cube exactly
         # the 0.750 that was hardcoded, so batches already run stay comparable.
         self.declare_parameter('object_depth_hi', 0.75)
+        # Per-pixel Gaussian depth noise in metres, added to the rendered
+        # image before anything reads it. MuJoCo's depth is exact, and every
+        # band, percentile and area threshold in this detector was tuned on
+        # exact depth. A RealSense D435 at 0.7m carries roughly 2-3mm RMS,
+        # so whether those thresholds survive noise is the largest open
+        # question about whether any of this transfers to hardware.
+        # Seeded, so a trial repeats.
+        self.declare_parameter('depth_noise_std', 0.0)
+        self.declare_parameter('depth_noise_seed', 0)
         # 0.09 puts the band's lower edge at 0.594, which overlaps the
         # forearm: the depth histogram shows forearm filling 0.40-0.60
         # continuously. 0.06 lifts the edge to 0.624 and excludes it.
@@ -92,6 +101,10 @@ class UniversalDetector(Node):
         self.publish_cam = self.get_parameter('publish_camera_frame').value
         self.depth_split = self.get_parameter('depth_split').value
         self.object_depth_hi = self.get_parameter('object_depth_hi').value
+        self.depth_noise_std = float(
+            self.get_parameter('depth_noise_std').value)
+        self._noise_rng = np.random.default_rng(
+            int(self.get_parameter('depth_noise_seed').value))
         self.gripper_band_below = self.get_parameter('gripper_band_below').value
         self.gripper_band_above = self.get_parameter('gripper_band_above').value
         self.gripper_min_area = self.get_parameter('gripper_min_area').value
@@ -142,6 +155,20 @@ class UniversalDetector(Node):
             self.get_logger().info('=== detector running UNLATCHED (continuous re-detection) ===')
         
         self.get_logger().info("=== 绝对坐标检测器启动 ===")
+
+    def _decode_depth(self, msg):
+        """Decode one depth frame, and add sensor noise if any was asked for.
+
+        Both read paths go through here so a frame is never noised twice and
+        the world-frame and camera-frame readings always see the same image.
+        """
+        img = np.nan_to_num(
+            self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough'),
+            nan=10.0)
+        if self.depth_noise_std > 0.0:
+            img = img + self._noise_rng.normal(
+                0.0, self.depth_noise_std, img.shape).astype(img.dtype)
+        return img
 
     def _blob_centroid_cam(self, depth_img, lo, hi, min_area=50):
         """Camera-frame centroid of the largest blob within a depth band."""
@@ -596,9 +623,7 @@ class UniversalDetector(Node):
         cv_image = None
         if self.publish_cam:
             try:
-                cv_image = np.nan_to_num(
-                    self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough'),
-                    nan=10.0)
+                cv_image = self._decode_depth(msg)
                 self.publish_camera_frame_points(cv_image)
             except Exception as e:
                 self.get_logger().error(f"camera-frame publish failed: {e}")
@@ -627,8 +652,7 @@ class UniversalDetector(Node):
         # ==========================================
         try:
             if cv_image is None:
-                cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-                cv_image = np.nan_to_num(cv_image, nan=10.0)
+                cv_image = self._decode_depth(msg)
 
             # 简单的深度分割提取物体 (0.3m ~ 1.5m 范围内)
             mask = (cv_image < self.object_depth_hi) & (cv_image > 0.3)
