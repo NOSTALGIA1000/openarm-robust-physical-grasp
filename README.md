@@ -45,7 +45,8 @@ python3 -m pytest tests -q
 5. **两条悬崖是两个不同的物理约束**：y 向 283 mm 受视场限（`detector_timeout`），x 向 112 mm 受运动学可达限（`planning_failure`）。
 6. **可达区**（左臂）：y ≥ 0 半平面，x ∈ [0.25, 0.38]。
 7. **精度与上限互不相干。** 残差在 ±15 mm 内由自定心被动吸收；把残差压到 ±2 mm 不改变成功率。
-8. **朴素的抓取前重探测有害**（残差放大 2–3 倍），**修正目标 ≠ 修正路径**（须回到 hover 再下降）。
+8. **朴素的抓取前重探测有害**（残差放大 2–3 倍），**修正目标 ≠ 修正路径**——去掉 re-hover 后 **0/20**，差值 −90.0% [−97.2%, −64.2%]，且 20 次**全部**是 `unilateral_contact`，与文档记载的对角线扫过机制一致（`stage49_ablation`）。
+10. **`rel_offset` 在真机选定配置下贡献为零**：置零后 18/20，差值 +0.0% [−21.4%, +21.4%]。该常数约 21mm 而配置有 25mm 余隙，自定心将其吸收。**免标定的路径可能不是「把常数算出来」而是「余隙足够时不需要它」**——但只测了一个条件，小余隙下未测。
 9. **实验室真方块（50mm）在仿真中可靠抓取**（`stage46_clearance`，119 次有效，零发散）。最佳配置 `open_position = 0.050`（每侧余隙 25mm）在 128mm 偏置下 **12/12** [76%, 100%]。真机建议参数：`open=0.050`、`close=0.016`（保持 18mm 压缩量）、`detector_z_bias=0.0305`、`object_depth_hi=0.750`。
 10. **与 ECL 迭代伺服基线的对比已完成**（`stage44_baseline`，72 次成对，零发散）。单次修正在成功率上**每格都不劣**：0/128/256 mm 处 11/11、11/12、9/12，伺服为 9/12、5/9、2/11。**伺服精度更好**（残差 ±1 mm vs 最差 13 mm）却**成功率更差**——它每次迭代都要重取一次读数，而读数是间歇的（超时 3/3/8 vs 0/0/1），且需约 **12 次**手臂移动而非 1 次。**这是「反复测量」结构在间歇传感器下的代价，不是伺服算法的失败。**
 
@@ -58,6 +59,8 @@ python3 -m pytest tests -q
 - 夹爪读数的残余双峰根因未定（判据可靠：`grip_cam z` 接近预期时残差 ±2 mm，偏浅时 ±15 mm）。
 
 ### 发现日志（按提出顺序，含已被推翻的条目）
+
+- **消融（`stage49_ablation`，78 次有效，78/78 零发散）**：仓库此前只有一次消融且 n=2。四臂各去掉一个部件，n=20。**re-hover 去掉后 0/20**（−90.0% [−97.2%, −64.2%]，20 次全为 `unilateral_contact`）；**`rel_offset` 置零后 18/20**（+0.0% [−21.4%, +21.4%]，测不出贡献）；固定 30px 窗口 13/17（−13.5% [−38.3%, +11.0%]，**跨 0，级联仍未证明有用也未证明无用**——n=20 分辨不了 13.5pp，按功效分析需 27 次）。
 
 - **深度噪声不是 sim-to-real 的主要风险**（`stage48_depthnoise`，96 次，96/96 零发散）。MuJoCo 深度精确无噪，而探测器所有阈值都是在无噪深度上调的；注入 0/1/2/5mm 逐像素高斯后，**六次配对比较（同偏置对照）全部跨 0**，成功率无可分辨影响。真机 RealSense 的 2–3mm RMS 落在已扫范围内。
 - **更意外：噪声反而收窄读数离散。** 夹爪读数相对手掌本体的深度偏移，sd 随注入 σ 从 **19.5mm 降到 7.3mm**（F=7.14，df=(21,22)，临界 2.36，显著）。推测是深度分位选取被噪声正则化了。**这不该读成「噪声有益」**——它说明既有双峰离散远大于传感器噪声，后者不构成额外约束。
@@ -137,7 +140,7 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[深度噪声](docs/results/2026-09-10-openarm-depth-noise.md) · [余隙配对检验](docs/results/2026-09-10-openarm-clearance-paired.md) · [余隙扫描与抬升耦合](docs/results/2026-09-09-openarm-clearance-and-lift-coupling.md) · [ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
+结论文档：[消融](docs/results/2026-09-11-openarm-ablation.md) · [深度噪声](docs/results/2026-09-10-openarm-depth-noise.md) · [余隙配对检验](docs/results/2026-09-10-openarm-clearance-paired.md) · [余隙扫描与抬升耦合](docs/results/2026-09-09-openarm-clearance-and-lift-coupling.md) · [ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
 
 前身阶段（**离线 MuJoCo 框架，装置与任务均与现行 ROS2 流程不同，结论不可直接迁移**）：[接触鲁棒性网格](docs/results/2026-08-12-contact-robustness-grid.md)（630 次配对种子，**全仓库唯一带 Wilson 置信区间的批次**，其自带的「Supported / Unsupported Claims」分节是本项目措辞规范的来源） · [逐步接触冒烟](docs/results/2026-08-13-per-step-contact-smoke.md) · [稳定性筛查](docs/results/2026-08-22-simulation-grasp-stability.md)（**唯一记录了环境块与场景 SHA-256 的批次**） · [接触形成诊断](docs/results/2026-09-01-openarm-contact-formation-diagnostics.md) · [接触面几何诊断](docs/results/2026-09-01-openarm-contact-surface-geometry-diagnosis.md)
 

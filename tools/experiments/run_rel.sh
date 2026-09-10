@@ -54,6 +54,7 @@ timeout 400 ros2 run openarm_grasp_physics physics_picker --ros-args \
   -p open_position:="${OPEN_POSITION:-0.030}" \
   -p close_position:="${CLOSE_POSITION:-0.006}" \
   -p lift_command_m:="${LIFT_COMMAND_M:-0.030}" \
+  -p rehover_after_correction:="${REHOVER:-true}" \
   -p servo_baseline:="${SERVO_BASELINE:-false}" \
   -p servo_max_iters:="${SERVO_MAX_ITERS:-6}" \
   -p servo_gain:="${SERVO_GAIN:-0.7}" \
