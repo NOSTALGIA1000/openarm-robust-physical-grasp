@@ -27,8 +27,12 @@ DETECTOR_SURFACE_OFFSET_M = 0.0055
 # clearance: 30mm object closed to a 12mm gap.
 SQUEEZE_M = 0.018
 # Band margin above the object's top face. 20mm covered the object's own depth
-# spread (the 44mm object measured 0.736 to 0.746) without reaching the table.
+# spread (the 44mm object measured 0.736 to 0.746) without reaching the table,
+# but a short object has less height to spend: a 20mm cube's top sits exactly
+# 20mm above the table, so the margin is capped to leave 10mm of the object
+# below the band edge. Unchanged for 30mm and above.
 OBJECT_BAND_MARGIN_M = 0.020
+TABLE_MARGIN_M = 0.010
 # Clearance that measured 12/12 at both biases on a 50mm cube (stage47_pairs).
 TARGET_CLEARANCE_M = 0.025
 
@@ -79,11 +83,12 @@ def main():
     print("\n=== 探测器 ===")
     print("  detector_z_bias    %.4f   (= 边长/2 + %.4f)"
           % (args.cube / 2 + DETECTOR_SURFACE_OFFSET_M, DETECTOR_SURFACE_OFFSET_M))
+    margin = min(OBJECT_BAND_MARGIN_M, args.cube - TABLE_MARGIN_M)
     print("  object_depth_hi    %.4f   (= 顶面深度 %.4f + %.3f)"
-          % (top_depth + OBJECT_BAND_MARGIN_M, top_depth, OBJECT_BAND_MARGIN_M))
+          % (top_depth + margin, top_depth, margin))
     print("  桌面深度           %.4f   (须 > object_depth_hi，余量 %.1f mm)"
-          % (table_depth, (table_depth - top_depth - OBJECT_BAND_MARGIN_M) * 1000))
-    if table_depth <= top_depth + OBJECT_BAND_MARGIN_M:
+          % (table_depth, (table_depth - top_depth - margin) * 1000))
+    if table_depth <= top_depth + margin:
         print("  !! 深度带会吃进桌面。减小 OBJECT_BAND_MARGIN_M 或抬高相机")
 
     print("\n=== 视场上限（可证伪的预测）===")

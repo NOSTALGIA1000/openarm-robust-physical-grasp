@@ -33,9 +33,23 @@ DETECTOR_SURFACE_OFFSET_M = 0.0055
 CAMERA_Z_M = 1.2
 # The object band must clear the object's own depth spread - the 44mm
 # cuboid measured 0.736 to 0.746 - without reaching the table at 0.780.
-# 20mm gives a 50mm cube exactly the 0.750 that was hardcoded, so the
-# cells already run under the old constant stay comparable.
+# 20mm gives a 50mm cube exactly the 0.750 that was hardcoded, so cells
+# already run under the old constant stay comparable.
+#
+# But a short object does not have 20mm to give: a 20mm cube's top sits
+# exactly 20mm above the table, so a fixed 20mm margin puts the band edge on
+# the table itself. The margin is therefore capped to leave at least 10mm of
+# the object's own height below it, which changes nothing for 30mm and above
+# and makes a 20mm cube workable.
 OBJECT_BAND_MARGIN_M = 0.020
+TABLE_MARGIN_M = 0.010
+# Commanded closing overshoot, held constant across object sizes so grip force
+# does not confound clearance. 30mm object closed to a 12mm gap.
+SQUEEZE_M = 0.018
+
+
+def band_margin(side_m):
+    return min(OBJECT_BAND_MARGIN_M, side_m - TABLE_MARGIN_M)
 
 
 def main():
@@ -62,13 +76,28 @@ def main():
             lambda m: "%s%.4f%s" % (m.group(1), TABLE_TOP_M + half, m.group(3)),
             text, count=1)
         name = "table_scene_c%03d.xml" % s
-        (out / name).write_text(text, encoding="utf-8")
         top_depth = CAMERA_Z_M - (TABLE_TOP_M + s / 1000.0)
+        (out / name).write_text(text, encoding="utf-8")
+        # Sidecar with every derived value, so the rules live in one file
+        # instead of being restated in each sweep. Three constants have gone
+        # wrong in this project by being duplicated - the object band edge, the
+        # reading-quality threshold, and the table height - each time because a
+        # value tuned for one configuration was written into another.
+        (out / name.replace(".xml", ".env")).write_text(
+            "DETECTOR_Z_BIAS=%.4f\n"
+            "DETECTOR_OBJECT_DEPTH_HI=%.4f\n"
+            "CLOSE_POSITION=%.4f\n"
+            "OBJECT_TOP_DEPTH=%.4f\n"
+            % (half + DETECTOR_SURFACE_OFFSET_M,
+               top_depth + band_margin(s / 1000.0),
+               max(0.0, (s / 1000.0 - SQUEEZE_M) / 2.0),
+               top_depth),
+            encoding="utf-8")
         print("%s  cube %dmm  clearance %.1fmm/side  z_bias %.4f  origin_z %.4f  "
               "top_depth %.4f  band_hi %.4f" % (
                   name, s, (60 - s) / 2.0, half + DETECTOR_SURFACE_OFFSET_M,
                   TABLE_TOP_M + half, top_depth,
-                  top_depth + OBJECT_BAND_MARGIN_M))
+                  top_depth + band_margin(s / 1000.0)))
 
 
 if __name__ == "__main__":

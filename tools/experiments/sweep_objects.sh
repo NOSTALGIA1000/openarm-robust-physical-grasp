@@ -36,9 +36,12 @@ for s in $SIDES; do
   scene=$(printf "table_scene_c%03d.xml" "$s")
   cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
   export PHYSICS_SCENE="$scene"
+  # Derived values come from the generator's sidecar, so the rules that
+  # produce them live in one file. Restating them here is how three
+  # constants went wrong before.
+  set -a; . "$OPENARM_MODEL/${scene%.xml}.env"; set +a
   # s/2 + 5.5mm, the detector's own top-surface offset measured on the cuboid.
-  export DETECTOR_Z_BIAS=0$(echo "scale=4; $s/2000 + 0.0055" | bc)
-  echo "=== cube ${s}mm (clearance $(( (60 - s) / 2 ))mm/side, z_bias=$DETECTOR_Z_BIAS) ==="
+    echo "=== cube ${s}mm (clearance $(( (60 - s) / 2 ))mm/side, z_bias=$DETECTOR_Z_BIAS) ==="
   for m in $BIASES; do
     v=$(echo "scale=4; $m/1000" | bc)
     for r in $(seq 1 "$REPEATS"); do

@@ -33,10 +33,11 @@ python3 "$EXPDIR/make_object_variants.py" \
 scene=$(printf "table_scene_c%03d.xml" "$SIDE")
 cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
 export PHYSICS_SCENE="$scene"
-export DETECTOR_Z_BIAS=0$(echo "scale=4; $SIDE/2000 + 0.0055" | bc)
-export DETECTOR_OBJECT_DEPTH_HI=0$(echo "scale=4; 1.2 - 0.420 - $SIDE/1000 + 0.020" | bc)
+# Derived values come from the generator's sidecar, so the rules that
+# produce them live in one file. Restating them here is how three
+# constants went wrong before.
+set -a; . "$OPENARM_MODEL/${scene%.xml}.env"; set +a
 export OPEN_POSITION=0.050
-export CLOSE_POSITION=0$(echo "scale=4; ($SIDE/1000 - 0.018) / 2" | bc)
 
 v=$(echo "scale=4; $BIAS/1000" | bc)
 

@@ -51,15 +51,12 @@ for cell in $CELLS; do
   scene=$(printf "table_scene_c%03d.xml" "$s")
   cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
   export PHYSICS_SCENE="$scene"
-  export DETECTOR_Z_BIAS=0$(echo "scale=4; $s/2000 + 0.0055" | bc)
-  # Object band far edge: top depth + 20mm, clear of the table at 0.780.
-  # Hardcoded at 0.75 it excluded any cube shorter than about 45mm - every
-  # 30mm trial returned no blob. 20mm gives a 50mm cube exactly 0.750, so
-  # the cells already run under the old constant remain comparable.
-  export DETECTOR_OBJECT_DEPTH_HI=0$(echo "scale=4; 1.2 - 0.420 - $s/1000 + 0.020" | bc)
-  export OPEN_POSITION="$op"
-  export CLOSE_POSITION=0$(echo "scale=4; ($s/1000 - 0.018) / 2" | bc)
-  clear_mm=$(echo "scale=1; ($op * 2000 - $s) / 2" | bc)
+  # Derived values come from the generator's sidecar, so the rules that
+  # produce them live in one file. Restating them here is how three
+  # constants went wrong before.
+  set -a; . "$OPENARM_MODEL/${scene%.xml}.env"; set +a
+    export OPEN_POSITION="$op"
+    clear_mm=$(echo "scale=1; ($op * 2000 - $s) / 2" | bc)
   if [ "$(echo "$clear_mm <= 0" | bc)" = "1" ]; then
     echo "=== SKIP cube ${s}mm open ${op}: clearance ${clear_mm}mm, jaws do not fit ==="
     continue
