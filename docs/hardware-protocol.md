@@ -15,14 +15,19 @@
 |---|---|
 | `fy`、`cy`（以及 `fx`、`cx`） | 相机厂商标定或 `camera_info` 话题 |
 | 相机→夹爪距离（hover 姿态） | 卷尺即可，±5mm 足够 |
-| 方块边长 | 已知 50mm |
+| 方块边长 | 已知 **20mm** |
 
 ```bash
 python3 tools/experiments/plan_hardware_params.py \
-  --fy <实测> --cy <实测> --standoff <实测> --cube 0.050
+  --fy <实测> --cy <实测> --standoff <实测> --cube 0.020
 ```
 
 输出即 `open_position`、`close_position`、`detector_z_bias`、`object_depth_hi`，以及**视场上限的预测值**。
+
+**20mm 方块的两处特有风险**（仿真未测过这个尺寸）：
+
+- **深度带余量吃紧**。20mm 方块顶面只比桌面高 20mm。余量已改为「20mm，但给桌面留至少 10mm」，故 `object_depth_hi = 0.7700`，距桌面仅 10mm。真机深度噪声若超过这个余量，桌面会被并进物体 blob。**第 1 步就要用 `probe_object_depth.py` 确认。**
+- **物体像素面积小**。20mm 在 0.76m 处约 15px 见方，面积约 232px²，虽高于 `min_area=50`，但明显小于 30mm 的 572。噪声下 blob 更易碎。
 
 该脚本用仿真装置的数值自检过，精确复现全部六个已知常数（余隙 25.0mm、压缩 18.0mm、`z_bias` 0.0305、`object_depth_hi` 0.7500、y 上限 283.3mm、x 上限 377.8mm）。
 
@@ -41,7 +46,7 @@ python3 tools/experiments/plan_hardware_params.py \
 | 现象 | 最可能的原因 | 先查 |
 |---|---|---|
 | `detector_timeout`，无 blob | 深度带上下界不对 | 用 `probe_object_depth.py` 量真实深度分布，对照 `object_depth_hi` |
-| 抓到但抬升不够 | `lift_command_m` 对真机滑移不够 | 看 `max_elevation_m`；仿真里 50mm 方块滑移 4.5mm，真机可能更大 |
+| 抓到但抬升不够 | `lift_command_m` 对真机滑移不够 | 看 `max_elevation_m`；仿真里 50mm 方块滑移 4.5mm、30mm 滑 8.5–11.5mm，**20mm 未测，按更大估** |
 | 单侧接触 | `close_position` 或对中 | 检查夹爪两指是否对称 |
 | 规划失败 | 目标超出可达域 | 与仿真的 y≥0 半平面、x∈[0.25,0.38] 对照 |
 
