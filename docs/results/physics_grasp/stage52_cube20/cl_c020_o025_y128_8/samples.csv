@@ -1,0 +1,1 @@
+sim_time,stage,left_contact,right_contact,left_force,right_force,object_x,object_y,object_z,object_qw,object_qx,object_qy,object_qz,gripper_x,gripper_y,gripper_z,elevation,drift
