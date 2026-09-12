@@ -12,18 +12,20 @@ the right-hand side is the per-side clearance. The claim is not that crossing
 the clearance guarantees failure - it does not - but that staying inside it is
 what success requires.
 
-Why the object width is a table here
-------------------------------------
-The trial record does not store the object's extents. detector_z_bias gives
-half the object's HEIGHT (the detector sees the top face and the grasp needs
-the centre, so z_bias = half_height + 5.5mm), which fixes the width only for a
-cube. The 30x30x44mm cuboid the scene carried before 2026-09-11 has a 22mm
-half-height and a 30mm jaw-axis width, so height cannot stand in for width.
+Where the object width comes from
+---------------------------------
+Preferably from environment.object_half_extents_m, which trial_record.py
+records from 2026-09-13 by reading the scene that ran: the y half-extent times
+two is the jaw-axis width.
 
-So WIDTHS_MM below is an explicit lookup and unknown values are refused rather
-than guessed - this project has mis-applied a configuration-specific constant
-six times, and guessing here would make seven. The proper fix is to record the
-object's half-extents in trial.json; the picker has the MuJoCo model and could.
+Trials recorded before that carry the object only by geom NAME, and
+detector_z_bias - the one numeric clue - is half the object's HEIGHT plus the
+detector's 5.5mm surface offset. Height fixes the width only for a cube: the
+30x30x44mm cuboid the scene carried before 2026-09-11 has a 22mm half-height
+and a 30mm jaw-axis width. So for those, WIDTHS_MM below is an explicit lookup
+and unknown values are refused rather than guessed - this project has
+mis-applied a configuration-specific constant six times and guessing here
+would make seven. The report says which source each trial used.
 
 Usage:
     python tools/experiments/analyse_jaw_criterion.py <batch dir> [<batch dir> ...]
@@ -86,14 +88,23 @@ def load(roots):
             if opening is None or zbias is None:
                 skipped["open_position or detector_z_bias missing"] += 1
                 continue
-            width = WIDTHS_MM.get(round(zbias, 4))
+            extents = (rec.get("environment") or {}).get(
+                "object_half_extents_m")
+            if extents and len(extents) >= 2:
+                # y half-extent, doubled: the jaws close along world y and the
+                # object is axis-aligned in these scenes.
+                width, source = 2.0 * float(extents[1]) * 1000.0, "recorded"
+            else:
+                width, source = WIDTHS_MM.get(round(zbias, 4)), "z_bias lookup"
             if width is None:
-                skipped["detector_z_bias %.4f not in WIDTHS_MM" % zbias] += 1
+                skipped["detector_z_bias %.4f not in WIDTHS_MM and no "
+                        "object_half_extents_m recorded" % zbias] += 1
                 continue
             rows.append({
                 "batch": batch,
                 "trial": rec.get("trial_id", ""),
                 "clearance": round((2.0 * opening * 1000.0 - width) / 2.0, 1),
+                "width_source": source,
                 "res_y": abs(meas["residual_y"]) * 1000.0,
                 "res_x": abs(meas.get("residual_x", 0.0)) * 1000.0,
                 "success": bool(rec.get("success")),
@@ -154,6 +165,9 @@ def main():
     print("%d trials from %d batch(es): %s"
           % (len(rows), len(batches),
              ", ".join("%s(%d)" % b for b in sorted(batches.items()))))
+    srcs = collections.Counter(r["width_source"] for r in rows)
+    print("object width from: %s"
+          % ", ".join("%s x%d" % s for s in srcs.most_common()))
     for reason, n in skipped.most_common():
         print("  skipped %d: %s" % (n, reason))
 

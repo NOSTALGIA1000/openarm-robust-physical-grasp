@@ -8,6 +8,7 @@ import os
 import platform
 import subprocess
 import sys
+import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -53,7 +54,32 @@ def _sha256(path: str) -> str:
         return hashlib.sha256(handle.read()).hexdigest()
 
 
-def describe_environment() -> dict:
+SCENE_DEFAULT = "table_scene_physics.xml"
+
+
+def _object_half_extents(scene_path: str, geom_name: str):
+    """Half-extents of the graspable object, read from the scene that ran.
+
+    Needed because trial.json recorded the object only by geom NAME, and
+    detector_z_bias - the one numeric clue - is half the object's HEIGHT plus
+    the detector's 5.5mm surface offset. Height fixes the width only for a
+    cube: the 30x30x44mm cuboid the scene carried before 2026-09-11 has a 22mm
+    half-height and a 30mm jaw-axis width. So the jaw-axis clearance, which
+    the 2026-09-13 criterion is stated against, could not be computed from the
+    record and had to come from a lookup table keyed on detector_z_bias.
+    """
+    root = ElementTree.parse(scene_path).getroot()
+    for geom in root.iter("geom"):
+        if geom.get("name") != geom_name:
+            continue
+        size = geom.get("size")
+        if not size:
+            return None
+        return [float(v) for v in size.split()]
+    return None
+
+
+def describe_environment(object_geom: str = "") -> dict:
     """What was running when the trial was produced.
 
     Only one result document in this project ever recorded an environment -
@@ -88,7 +114,15 @@ def describe_environment() -> dict:
     model_dir = os.environ.get("OPENARM_MODEL", "")
     if model_dir:
         digests = {}
-        for name in ("openarm_bimanual_physics.xml", "table_scene_physics.xml"):
+        # The scene that actually ran, not a fixed name. PHYSICS_SCENE selects
+        # a generated variant, and hashing table_scene_physics.xml regardless
+        # left every variant batch - stage52_cube20, stage53_noise20,
+        # stage51_offseterror - with a checksum for a file it did not use. That
+        # is worse than no checksum, because it reads as if the scene were
+        # pinned when the scene in play was unhashed.
+        scene = os.environ.get("PHYSICS_SCENE", SCENE_DEFAULT)
+        env["scene"] = scene
+        for name in ("openarm_bimanual_physics.xml", scene):
             path = os.path.join(model_dir, name)
             try:
                 digests[name] = _sha256(path)
@@ -96,6 +130,15 @@ def describe_environment() -> dict:
                 pass
         if digests:
             env["model_sha256"] = digests
+
+        if object_geom:
+            try:
+                extents = _object_half_extents(
+                    os.path.join(model_dir, scene), object_geom)
+            except (OSError, ElementTree.ParseError, ValueError):
+                extents = None
+            if extents:
+                env["object_half_extents_m"] = extents
 
     # The hand-eye error is injected into the world->camera_base_link static
     # transform by the launch file, which reads these same two variables. It is
@@ -156,7 +199,7 @@ class TrialRecorder:
             "observations": dataclasses.asdict(observations),
             "measurements": self._measurements,
             "config": self._config.snapshot(),
-            "environment": describe_environment(),
+            "environment": describe_environment(self._config.object_geom),
         }
 
         with open(os.path.join(self._trial_dir, "trial.json"), "w") as handle:
