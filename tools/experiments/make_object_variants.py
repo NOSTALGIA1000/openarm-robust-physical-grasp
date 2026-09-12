@@ -6,14 +6,19 @@ scene carried a 30x30x44mm cuboid, which is not what the hardware will present.
 
 Side length moves three things at once, and all three have to move together:
 
-  clearance   the pre-grasp gap is 60mm (open_position 0.030 per finger), so a
-              cube of side s leaves (60 - s)/2 per side - the budget that
-              absorbs residual error
+  clearance   the pre-grasp gap is 2*open_position, so a cube of side s
+              leaves (2*open_position*1000 - s)/2 mm per side - the budget
+              that absorbs residual error. This script is not told the
+              opening unless --open is passed, so it prints the formula
+              rather than a number; it used to print (60 - s)/2, which is
+              right only at open_position 0.030 and was off by 5mm in every
+              batch run at 0.025 - stage52_cube20, stage53_noise20 and
+              stage51_offseterror all logged 20.0mm/side for a real 15.0
   z bias      the detector measures the top face, the grasp needs the centre.
               The 44mm-tall object needed 27.5mm against a 22mm half-height,
               so the detector's own surface offset is 5.5mm and a cube of side
               s needs s/2 + 5.5mm
-  placement   the body origin sits half a side above the table top at 0.425
+  placement   the body origin sits half a side above the table top at 0.420
 
 Emits the matching detector_z_bias for each variant; the sweep passes it
 through, since leaving it at the cuboid's value would put every descent off by
@@ -55,9 +60,19 @@ def band_margin(side_m):
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
-    src = pathlib.Path(sys.argv[1])
-    out = pathlib.Path(sys.argv[2])
-    sides = [int(s) for s in (sys.argv[3:] or ["20", "30", "40"])]
+    args = sys.argv[1:]
+    # --open <metres per finger>, so the printed clearance can be the real one.
+    # Optional because most sweeps set OPEN_POSITION after calling this script,
+    # and reading it from the environment would be right for one sweep and
+    # silently wrong for the rest.
+    opening = None
+    if "--open" in args:
+        i = args.index("--open")
+        opening = float(args[i + 1])
+        del args[i:i + 2]
+    src = pathlib.Path(args[0])
+    out = pathlib.Path(args[1])
+    sides = [int(s) for s in (args[2:] or ["20", "30", "40"])]
     out.mkdir(parents=True, exist_ok=True)
     base = src.read_text(encoding="utf-8")
 
@@ -93,9 +108,12 @@ def main():
                max(0.0, (s / 1000.0 - SQUEEZE_M) / 2.0),
                top_depth),
             encoding="utf-8")
-        print("%s  cube %dmm  clearance %.1fmm/side  z_bias %.4f  origin_z %.4f  "
+        clearance = ("%.1fmm/side" % ((2.0 * opening * 1000.0 - s) / 2.0)
+                     if opening is not None
+                     else "(2*open_position*1000-%d)/2 mm/side" % s)
+        print("%s  cube %dmm  clearance %s  z_bias %.4f  origin_z %.4f  "
               "top_depth %.4f  band_hi %.4f" % (
-                  name, s, (60 - s) / 2.0, half + DETECTOR_SURFACE_OFFSET_M,
+                  name, s, clearance, half + DETECTOR_SURFACE_OFFSET_M,
                   TABLE_TOP_M + half, top_depth,
                   top_depth + band_margin(s / 1000.0)))
 

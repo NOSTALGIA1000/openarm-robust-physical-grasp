@@ -56,7 +56,10 @@ export DETECTOR_ROI_CASCADE=90,55,30
 # per side instead of 15mm. 0.025 is the configuration chosen for the robot.
 export OPEN_POSITION="${OPEN_POSITION:-0.025}"
 
-python3 "$EXPDIR/make_object_variants.py" \
+# --open so the logged clearance is the real one. This sweep can pass it
+# because OPEN_POSITION is set above; the other sweeps set it after this
+# call and so log the formula instead of a number.
+python3 "$EXPDIR/make_object_variants.py" --open "$OPEN_POSITION" \
   "$OPENARM_MODEL/table_scene_physics.xml" "$OPENARM_MODEL" "$SIDE" || exit 6
 scene=$(printf "table_scene_c%03d.xml" "$SIDE")
 cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
