@@ -24,6 +24,30 @@
 
 **注意**：上游 OpenArm MuJoCo 网格资产未随仓库分发。模型用 `meshdir="meshes"` 相对路径解析到本机 OpenArm checkout（`~/openarm_ws/src/openarm_mujoco`）。许可已逐项核查完毕，见 [THIRD_PARTY.md](../THIRD_PARTY.md)。
 
+### 1.2 模型校验和在 2026-09-12 变过一次（仅注释）
+
+`trial.json` 的 `environment.model_sha256` 记录模型文件的 sha256。2026-09-12 为满足 Apache-2.0 §4 给 `openarm_bimanual_physics.xml` 恢复上游版权头并附修改声明，**该文件的哈希因此改变**：
+
+| | sha256（前 16 位） |
+|---|---|
+| 2026-09-12 之前 | `257722e8a00e698c` |
+| 之后 | `9846f6858142d5f0` |
+
+**模型物理上未变**，改动只有文件开头的 XML 注释。已用 MuJoCo 真编译核对前后一致：
+
+```
+table_scene_physics.xml   nbody=36 njnt=22 ngeom=110 nsensor=5
+table_scene_c020.xml      nbody=36 njnt=22 ngeom=110 nsensor=5
+```
+
+复核：
+
+```bash
+ssh -p 2224 nostalgia@127.0.0.1 'cd ~/ros2_ws_course_repro/ros2_ws/src/openarm_moveit_config/model &&   python3 -c "import mujoco; m=mujoco.MjModel.from_xml_path(\"table_scene_physics.xml\");   print(m.nbody, m.njnt, m.ngeom, m.nsensor)"'
+```
+
+跨 2026-09-12 比较批次时，**哈希不同不代表模型不同**；反之哈希相同仍是模型相同的充分证据。
+
 ### 1.1 虚拟机配额与内核软锁死
 
 | 项 | 值 |

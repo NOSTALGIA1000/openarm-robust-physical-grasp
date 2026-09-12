@@ -2,20 +2,20 @@
 
 - Result: `success`
 - Success: `True`
-- Samples: `1517`
-- Max elevation: `0.0351 m` (threshold `0.020 m`)
+- Samples: `1575`
+- Max elevation: `0.0393 m` (threshold `0.020 m`)
 - Hold bilateral ratio: `1.000` (threshold `0.80`)
-- Max relative drift: `0.0071 m` (threshold `0.010 m`)
+- Max relative drift: `0.0070 m` (threshold `0.010 m`)
 
 ## Stage times (simulation seconds)
 
-- `settle`: `16.880`
-- `hover`: `18.080`
-- `open`: `32.700`
-- `descend`: `33.860`
-- `close`: `37.460`
-- `lift`: `39.440`
-- `hold`: `41.920`
-- `retreat`: `43.920`
+- `settle`: `15.120`
+- `hover`: `17.040`
+- `open`: `33.420`
+- `descend`: `34.640`
+- `close`: `38.540`
+- `lift`: `39.760`
+- `hold`: `42.620`
+- `retreat`: `44.660`
 
 No software attachment and no object pose command exist in this mode; object motion is produced only by contact.

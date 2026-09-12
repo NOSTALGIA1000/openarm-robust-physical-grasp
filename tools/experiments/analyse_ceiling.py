@@ -38,14 +38,18 @@ def main():
         key = (parts[1], int(parts[2][1:]))
         cells[key].append(rec["category"])
         m = rec.get("measurements") or {}
-        if m.get("grip_cam_z", 0.0) >= 0.66:
+        # Unfiltered, and the count is printed. The old grip_cam_z >= 0.66 cut
+        # was tuned for a 44mm cuboid, left cells of n=0..8 on later
+        # configurations, and selects on grip_cam_z - which is itself the noisy
+        # depth reading. See the docstring of analyse_depthnoise.py.
+        if "residual_x" in m:
             resid[key].append((m["residual_x"], m["residual_y"]))
 
     for arm in sorted({a for a, _ in cells}):
         print("\n=== %s ===" % arm)
-        print("%6s %4s %8s %20s %9s %9s  %s" % (
-            "bias", "n", "success", "Wilson 95%", "res_x mm", "res_y mm",
-            "other outcomes"))
+        print("%6s %4s %8s %20s %5s %9s %9s  %s" % (
+            "bias", "n", "success", "Wilson 95%", "res_n", "res_x mm",
+            "res_y mm", "other outcomes"))
         for bias in sorted(b for a, b in cells if a == arm):
             outcomes = cells[(arm, bias)]
             n = len(outcomes)
@@ -58,8 +62,8 @@ def main():
                 "%s:%d" % (c, v)
                 for c, v in collections.Counter(outcomes).items()
                 if c != "success")
-            print("%6d %4d %3d/%-4d [%5.1f%%, %5.1f%%] %9.2f %9.2f  %s" % (
-                bias, n, k, n, lo * 100, hi * 100, rx, ry, other))
+            print("%6d %4d %3d/%-4d [%5.1f%%, %5.1f%%] %5d %9.2f %9.2f  %s" % (
+                bias, n, k, n, lo * 100, hi * 100, len(r), rx, ry, other))
 
 
 if __name__ == "__main__":
