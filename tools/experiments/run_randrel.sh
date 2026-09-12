@@ -18,6 +18,12 @@ source "$ROS_SETUP"
 source "$OPENARM_INSTALL/setup.bash"
 LOG="/tmp/physics_launch_${TRIAL}.log"
 OUT="$OPENARM_RESULTS/$OUTDIR"
+# A cell topped up by raising the repeat count reruns from 1 and overwrites the
+# records already there; see the note in run_rel.sh. Refuse; FORCE=1 to redo.
+if [ -f "$OUT/$TRIAL/trial.json" ] && [ -z "${FORCE:-}" ]; then
+  echo "trial $TRIAL -> already_recorded (set FORCE=1 to redo)"
+  exit 0
+fi
 mkdir -p "$OUT"
 bash "$EXPDIR/preflight.sh" 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
 python3 "$EXPDIR/add_pose_rand.py" 0 "$DX" "$DY" "$YAW" "$SCENE" >/dev/null || exit 6

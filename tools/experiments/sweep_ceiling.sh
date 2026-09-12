@@ -22,6 +22,9 @@ EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "$EXPDIR/env.sh"
 
 REPEATS="${REPEATS:-12}"
+# Repeat index to start from, so a cell can be topped up without
+# renumbering over the trials already recorded: FIRST=13 REPEATS=27.
+FIRST="${FIRST:-1}"
 BIASES="${BIASES:-240 288 320}"
 OUTDIR="${OUTDIR:-stage40_ceiling}"
 GAIN="${GAIN:-0.0478}"
@@ -42,7 +45,7 @@ run_arm() {
   echo "=== $tag (gain=$gain, rel_offset=$offx,$offy, windows=$WINDOWS) ==="
   for m in $BIASES; do
     v=$(echo "scale=4; $m/1000" | bc)
-    for r in $(seq 1 "$REPEATS"); do
+    for r in $(seq "$FIRST" "$REPEATS"); do
       bash "$EXPDIR/run_rel.sh" "cl_${tag}_y${m}_${r}" 0.0 "0$v" \
         "$OUTDIR" "$offx" "$offy" 2>&1 \
         | grep -E 'INSTABILITY|trial .* ->' | tail -2

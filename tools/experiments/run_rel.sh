@@ -17,6 +17,14 @@ OUT="$OPENARM_RESULTS/$OUTDIR"
 # reasoning for three completed batches went that way before anyone noticed -
 # the trial records survived because they were always written here.
 TRIALDIR="$OUT/$TRIAL"
+# mkdir -p overwrites in place, and every sweep numbers its repeats from 1, so
+# topping a cell up from n=12 to n=27 by raising REPEATS would rerun 1..12 over
+# the records that are already there - an hour of machine time spent destroying
+# data. Refuse instead. Set FORCE=1 to deliberately redo a trial.
+if [ -f "$TRIALDIR/trial.json" ] && [ -z "${FORCE:-}" ]; then
+  echo "trial $TRIAL -> already_recorded (set FORCE=1 to redo)"
+  exit 0
+fi
 mkdir -p "$TRIALDIR"
 LOG="$TRIALDIR/launch.log"
 PICKERLOG="$TRIALDIR/picker.log"

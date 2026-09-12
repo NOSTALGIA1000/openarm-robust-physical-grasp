@@ -7,6 +7,12 @@ source "$OPENARM_INSTALL/setup.bash"
 TRIAL="$1"; BX="$2"; BY="$3"; CORR="${4:-false}"; OUTDIR="${5:-stage2b}"
 LOG="/tmp/physics_launch_${TRIAL}.log"
 OUT="$OPENARM_RESULTS/$OUTDIR"
+# A cell topped up by raising the repeat count reruns from 1 and overwrites the
+# records already there; see the note in run_rel.sh. Refuse; FORCE=1 to redo.
+if [ -f "$OUT/$TRIAL/trial.json" ] && [ -z "${FORCE:-}" ]; then
+  echo "trial $TRIAL -> already_recorded (set FORCE=1 to redo)"
+  exit 0
+fi
 mkdir -p "$OUT"
 bash "$EXPDIR/preflight.sh" 1024 >/dev/null || { echo "$TRIAL preflight_abort"; exit 5; }
 setsid nohup ros2 launch openarm_moveit_config run_physics_grasp.launch.py viewer_render_period:=1.0 > "$LOG" 2>&1 < /dev/null &
