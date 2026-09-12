@@ -1,3 +1,16 @@
+# Derived from the course reference implementation of openarm_moveit_config
+# (author: yhang <1936951548@qq.com>), which declares <license>BSD</license> in
+# its package.xml but ships no license text and no copyright line. The BSD
+# variant is therefore UNRESOLVED and this file MUST NOT be published until it
+# is settled; see THIRD_PARTY.md section 2.
+#
+# Of the original file's 87 unique effective lines, 80 survive here (pinhole
+# back-projection, intrinsics from fovy, the tf2 world lookup, the lock-and-
+# broadcast state machine, and the class/node names). Everything else -- the
+# gripper blob channel, the relative optical measurement, the depth band
+# parameters, noise injection and the structured logging -- is original to this
+# project and is licensed under the Apache License, Version 2.0.
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image

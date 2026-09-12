@@ -1,4 +1,39 @@
 <?xml version='1.0' encoding='utf-8'?>
+<!--
+Copyright 2026 Enactic, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!--
+NOTICE OF MODIFICATION (Apache License 2.0, section 4(b))
+
+Derived from openarm_mujoco v2/openarm_bimanual.xml (Enactic, Inc.).
+Modified 2026 by the openarm-robust-physical-grasp authors. Changes:
+
+  * Joint dynamics of all four motor classes retuned for this study
+    (DM8009/DM4340/DM4310 armature, damping, frictionloss).
+  * Finger joints changed from type="hinge" to type="slide"
+    (damping 100.0, stiffness 0.1) so the gripper closes prismatically.
+  * Added a <sensor> block (framepos, framequat, framelinvel, frameangvel,
+    velocimeter) to publish grasp telemetry.
+  * Added 28 <contact><exclude> pairs to suppress self-collision chatter.
+  * Model name openarm_v20 -> openarm.
+
+Mesh assets referenced through meshdir="meshes" are NOT redistributed with
+this repository; they come from an OpenArm checkout. See docs/reproduction.md.
+-->
+
 <mujoco model="openarm">
   <default>
     <!-- <geom friction="0.0001" margin="0.0005" /> -->

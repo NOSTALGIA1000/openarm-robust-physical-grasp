@@ -1,4 +1,17 @@
 <?xml version="1.0" ?>
+<!--
+Copyright 2026 the openarm-robust-physical-grasp authors
+Licensed under the Apache License, Version 2.0. See LICENSE at the repo root.
+
+The link names, joint axes and origin offsets in this file are derived from
+openarm_description (Copyright 2025 Enactic, Inc., Apache License 2.0):
+https://github.com/enactic/openarm_description
+
+This is a collision-free kinematic skeleton written for this study: it carries
+no <mesh> geometry, so no OpenArm mesh asset is redistributed here. The table,
+camera mount and object links are original to this project.
+-->
+
 <robot name="openarm_bimanual_table_scene">
   <link name="world"/>
 

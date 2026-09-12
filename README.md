@@ -164,7 +164,7 @@ python3 -m pytest tests -q
 2. **消融与统计补测**：去 re-hover、去 ROI、去 `rel_offset` 各 n≥20，报 Wilson 区间。目前唯一的消融是 n=2。样本量依据见 `docs/statistics.md`。
 3. **余隙扫描（`sweep_clearance.sh`，已完成）**：当时以为实验室方块是 50mm（**实为 20mm，2026-09-11 更正**），而预张开间隙 60mm 只给它 **5mm/侧**——现有全部结论所依赖的 15mm/侧余隙在真机上只有三分之一。余隙 =（2·open_position − 边长）/2，可由物体尺寸与张开度**两条独立途径**改变，故本批次测的是机制而非表格：`50mm@0.040` 与 `30mm@0.030` 同为 15mm/侧，`50mm@0.050` 与 `30mm@0.040` 同为 25mm/侧，配对格点若表现一致即支持「余隙主导」。`close_position` 按 (边长−18mm)/2 缩放以固定压缩量 18mm，否则 50mm 方块会被压 38mm，夹持力与余隙混淆。
 4. **右臂覆盖 y < 0**，验证双臂互补能否覆盖整张桌面。
-5. **LICENSE**：上游资产许可未逐项确认，**公开代码前必须解决**。
+5. **LICENSE（已逐项核查，剩一项未决）**：整仓采用 Apache-2.0，上游归属见 [NOTICE](NOTICE) 与 [THIRD_PARTY.md](THIRD_PARTY.md)。OpenArm（Enactic，Apache-2.0）与 `mujoco_ros2_control`（Sangtaek Lee，MIT）均已合规，被剥掉的上游版权头已恢复并附修改声明，OpenArm 网格资产本就不打包。**唯一未决项**是 `apple_detector.py`：课程包声明 `<license>BSD</license>` 但无许可文本、无版权行，版本无法确定；且我们的版本确为派生（原版 87 条唯一有效行中 80 条仍在）。**在联系作者确认版本与版权行之前不得公开发布。**
 
 仍然开放但优先级较低：
 
@@ -179,4 +179,13 @@ python3 -m pytest tests -q
 
 ## 来源与许可
 
-项目包含实验代码、实验结果，以及基于 OpenArm/MuJoCo 资产形成的研究材料。上游组件保留各自许可。本仓库暂不声明覆盖全部内容的统一许可证；公开复用前需逐项确认上游和课程参考代码许可。
+本仓库采用 **Apache License 2.0**（[LICENSE](LICENSE)）。选它的理由、上游逐项核查结果与复核命令见 [THIRD_PARTY.md](THIRD_PARTY.md)，归属声明见 [NOTICE](NOTICE)。
+
+摘要：
+
+- **OpenArm**（模型与描述）——Copyright 2025–2026 Enactic, Inc.，Apache-2.0。派生文件已恢复上游版权头并按 §4(b) 附修改声明。**STL 网格不随本仓库分发**，靠 `meshdir="meshes"` 解析到本机 OpenArm checkout。
+- **mujoco_ros2_control**——Copyright (c) 2025 Sangtaek Lee，MIT。派生文件头部即 MIT 全文，已合规；本项目加进该包的四个文件为 Apache-2.0 并已注明非派生。
+- **课程参考代码**（`apple_detector.py`，作者 yhang）——`package.xml` 声明 BSD 但**无许可文本、无版权行**，版本未决。见 THIRD_PARTY.md §2。**这是公开发布前的唯一阻塞项。**
+- 其余代码、脚本、文档与 `docs/results/**` 下的试验数据均为本项目自有，Apache-2.0。
+
+Apache-2.0 含显式专利授权：**写进本仓库并以此许可发布的机制，其专利许可已授予使用者**。若确定要走专利路线，应先申请后开源，或把待申请部分留在仓库之外（见 [相关工作](docs/related-work.md)）。
