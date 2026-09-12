@@ -84,6 +84,18 @@ python3 -m pytest tests -q
 
 - **同时查出的记录缺陷**：偏置有两套注入路径，**物理正确的那套从未被记录**。`CAM_BIAS_X/Y` 经环境变量进 `world → camera_base_link` 静态 TF（手眼误差真正所在），而 `config.calib_bias_x/y` 是事后加到目标上的合成偏移。1407 次里 **985 次**的自变量只存在于目录名中，信 `config` 会把 240mm 与 320mm 一起归成 0mm——首遍分析正是这样被静默误导。已修 `describe_environment()` 记录之，已有数据不回填。另修分析侧两处：跨批次合并曾把按设计失败的消融臂混入（128mm 那格 n=446 读出 80.9%，低于 240mm 的 91.7%），现按配置签名分组并加 `assert`；`n_for_separation` 曾因 banker's rounding 给出 n=14 而与仓库自己的 `docs/statistics.md`（27）矛盾，已换成两比例功效公式，**精确复现该文档五行全部数值**。
 
+- **一条判据取代整张容差表**（`stage51_offseterror` 新增 76 次 + 三个既有批次，汇总 **284 次**，零发散）。成功 ⟺ **夹爪闭合方向的残差落在每侧余隙内**：余隙 15mm 组判据内 **168/171 = 98.2%**（剔除 IK 与探测失败后 **168/169 = 99.4%**），判据外 **31/73 = 42.5%**，Newcombe **[+0.439, +0.665]**。跨两种物体几何、三种张开度、四个批次。判据外主失败形态是 `unilateral_contact` 32 次，与机制同向。
+
+- **各向异性从推断变成逐次证据**：给定 `res_y` 在界内，`res_x` 越界（最大 **25.6mm**）仍有 **26/27** 成功，差 [−0.024, +0.169] **跨零**；r(res_x, res_y) 仅 0.153，不是相关性借来的。pad 宽度方向能吸收超过余隙的误差，夹爪闭合方向不能。
+
+- **「免标定」靠的是预算占比，不是宽容**：注入 `rel_offset_y` 误差 **1:1** 传到残差（+3.81/+17.45/+25.94 对应 10/20/30mm），修正机制按设计工作；而拟合常数 (−20.9, **−0.7**)mm 的 y 分量只占 15mm 预算的 **4.7%**。这才是归零不花代价的原因。
+
+- **判据统一了四条此前独立的结论**：归零 `rel_offset` 免费、`cl_vg` 在 288mm 处 0/12（其 `res_y` 40.40mm 是余隙的 2.7 倍）、余隙主导 12 对跨尺寸配对中的 11 对、精度与上限互不相干（15mm 内都是 100%，压得更小无空间可赚）。
+
+- **但必要而非充分，也不是一道墙**：25mm 余隙臂全部在界内却只有 82.5%，低于 15mm 余隙组的 98.2%——加宽张开度另有代价；判据外仍有 42.5% 成功，且 20–25mm 箱（75%）高于 15–20mm 箱（56%）。**写在脚本头部的预测按其字面表述被推翻**（格点成功率 68/80/63/56%，无悬崖），成立的是机制而非观测量——注入误差到实现残差之间有 sd 约 10mm 的噪声，四个格点各自都混着边界两侧。
+
+- **判据在真机上是诊断量不是操作量**：`residual_y` 需要真值。真机可用的是余隙的事先计算与**失败形态的直接读取**（`unilateral_contact` 指向 y 向越界），二者都不需要真值。
+
 **Stage 1、Stage 3、Stage 2 均已完成。系统可完成真实物理抓取与抬升，并已测得标定误差容差曲线。**
 
 - **假绑定已彻底证伪**：错位对照 824 采样零接触、物体全程未动；且实测原课程夹爪开口 72 mm 大于 50 mm 物体，本就碰不到，其「抓取」100% 来自软件绑定。
@@ -154,7 +166,7 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[失效形态](docs/results/2026-09-12-openarm-degradation-shape.md) · [20mm 噪声](docs/results/2026-09-12-openarm-cube20-noise.md) · [20mm 方块](docs/results/2026-09-11-openarm-cube20.md) · [offset 轴向](docs/results/2026-09-11-openarm-offset-axis.md) · [消融](docs/results/2026-09-11-openarm-ablation.md) · [深度噪声](docs/results/2026-09-10-openarm-depth-noise.md) · [余隙配对检验](docs/results/2026-09-10-openarm-clearance-paired.md) · [余隙扫描与抬升耦合](docs/results/2026-09-09-openarm-clearance-and-lift-coupling.md) · [ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
+结论文档：[夹爪轴判据](docs/results/2026-09-13-openarm-jaw-axis-criterion.md) · [失效形态](docs/results/2026-09-12-openarm-degradation-shape.md) · [20mm 噪声](docs/results/2026-09-12-openarm-cube20-noise.md) · [20mm 方块](docs/results/2026-09-11-openarm-cube20.md) · [offset 轴向](docs/results/2026-09-11-openarm-offset-axis.md) · [消融](docs/results/2026-09-11-openarm-ablation.md) · [深度噪声](docs/results/2026-09-10-openarm-depth-noise.md) · [余隙配对检验](docs/results/2026-09-10-openarm-clearance-paired.md) · [余隙扫描与抬升耦合](docs/results/2026-09-09-openarm-clearance-and-lift-coupling.md) · [ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
 
 前身阶段（**离线 MuJoCo 框架，装置与任务均与现行 ROS2 流程不同，结论不可直接迁移**）：[接触鲁棒性网格](docs/results/2026-08-12-contact-robustness-grid.md)（630 次配对种子，**全仓库唯一带 Wilson 置信区间的批次**，其自带的「Supported / Unsupported Claims」分节是本项目措辞规范的来源） · [逐步接触冒烟](docs/results/2026-08-13-per-step-contact-smoke.md) · [稳定性筛查](docs/results/2026-08-22-simulation-grasp-stability.md)（**唯一记录了环境块与场景 SHA-256 的批次**） · [接触形成诊断](docs/results/2026-09-01-openarm-contact-formation-diagnostics.md) · [接触面几何诊断](docs/results/2026-09-01-openarm-contact-surface-geometry-diagnosis.md)
 
