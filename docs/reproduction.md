@@ -22,7 +22,33 @@
 
 依赖：`tools/requirements-sim.txt`（离线 MuJoCo 框架）。ROS2 侧依赖由 `rosdep` 与各包 `package.xml` 决定。
 
-**注意**：上游 OpenArm MuJoCo 资产以绝对路径引用（`~/openarm_ws/src/openarm_mujoco`），未随仓库分发，许可证未逐项确认——见 README「来源与许可」。
+**注意**：上游 OpenArm MuJoCo 网格资产未随仓库分发。模型用 `meshdir="meshes"` 相对路径解析到本机 OpenArm checkout（`~/openarm_ws/src/openarm_mujoco`）。许可已逐项核查完毕，见 [THIRD_PARTY.md](../THIRD_PARTY.md)。
+
+### 1.1 虚拟机配额与内核软锁死
+
+| 项 | 值 |
+|---|---|
+| 宿主逻辑核 | 16 |
+| VM vCPU | **4**（`cpuexecutioncap=100`）|
+| VM 内存 | 7675 MB |
+| 跑批时 load average | **约 4.3**（即 4 核满载）|
+
+**4 个 vCPU 对本流水线不够用。**MuJoCo、`ros2_control`、`move_group`、探测器与 picker 同时在跑，guest 内核的 RCU 宽限期线程被饿死，产生软锁死：
+
+```
+watchdog: BUG: soft lockup - CPU#2 stuck for 179s! [swapper/2:0]
+rcu: rcu_preempt kthread starved for 200356 jiffies!
+```
+
+两天内 **6 次**同类内核事件（`journalctl -k --since "2026-09-10" | grep -c "rcu_preempt\|soft lockup"`）。**这就是此前记为「ROS CLI 挂死」的那四次事件的机制**（105 分钟、11.6 小时、3 小时，以及 `stage53_noise20` 的 `dn_n000_y128_11` 挂 28 分钟后被下一次试验的 preflight 用 SIGKILL 清掉——所有进程 `exit code -9`，正是设计中的清理行为）。
+
+**后果与处置**：
+
+- **物理结论不受影响**：仿真按 sim_time 推进，每个批次都断言 `sim_time` 严格单调并 grep `unstable`/`QACC`；受影响的是墙钟编排，不是动力学。
+- **试验丢失率约 4%**（`stage53_noise20` 48 次丢 2 次）。样本量规划要按此打折：要 n=27 就得排 29 次。
+- 丢失的试验**不留 `trial.json`**，只留 `launch.log`。因此「目录数」不等于「试验数」，分析脚本必须按 `trial.json` 存在与否计数——不是按目录。
+- **建议把 vCPU 提到 8**（宿主有 16 核，未超配）。需要关机改配置，**不要在批次运行时动**。
+
 
 ## 2. 构建
 
