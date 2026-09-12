@@ -96,6 +96,22 @@ def describe_environment() -> dict:
                 pass
         if digests:
             env["model_sha256"] = digests
+
+    # The hand-eye error is injected into the world->camera_base_link static
+    # transform by the launch file, which reads these same two variables. It is
+    # therefore an environment fact, not a picker parameter, and until now it
+    # was recorded nowhere: config.calib_bias_x/y stay 0.0 for every trial run
+    # this way, so the ceiling batches (240/288/320/384mm) carry their own
+    # independent variable only in the directory name. A reanalysis that trusts
+    # the config gets 0mm for all of them and groups them together, silently.
+    for var, key in (("CAM_BIAS_X", "cam_bias_x"), ("CAM_BIAS_Y", "cam_bias_y")):
+        raw = os.environ.get(var)
+        if raw is None:
+            continue
+        try:
+            env[key] = float(raw)
+        except ValueError:
+            env[key] = raw
     return env
 
 
