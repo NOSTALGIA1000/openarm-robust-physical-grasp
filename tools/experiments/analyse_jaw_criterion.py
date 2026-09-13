@@ -1,38 +1,46 @@
-"""Does the grasp succeed exactly when the jaw-axis residual fits the clearance?
+"""Which offsets a grasp survives, measured where the jaws actually close.
 
-Every tolerance number this project has produced is a table: this bias, this
-cube, this opening, this success rate. This asks whether one computable
-criterion accounts for them, by pooling batches that differ in object, opening
-and date and splitting each trial on a quantity the trial record already holds:
+Every tolerance number this project produced before 2026-09-14 was a table:
+this bias, this cube, this opening, this success rate. This asks whether a
+computable criterion accounts for them, by pooling batches that differ in
+object, opening and date and splitting each trial on the offset between the
+gripper and the object at the moment the jaws start closing.
 
-    succeed  iff  |residual_y| < (2 * open_position * 1000 - width_mm) / 2
+    succeed  <==  |offset_y| < (2 * open_position * 1000 - width_mm) / 2
+                  and |offset_x| < the pad span
 
-residual_y is the post-correction error in the direction the jaws close, and
-the right-hand side is the per-side clearance. The claim is not that crossing
-the clearance guarantees failure - it does not - but that staying inside it is
-what success requires.
+The first bound is the per-side clearance. Staying inside it is sufficient,
+not necessary - crossing it does not guarantee failure - and the two axes fail
+differently: past the y bound one jaw still touches (unilateral_contact), past
+the x bound neither does (no_contact).
 
-Where the object width comes from
----------------------------------
-Preferably from environment.object_half_extents_m, which trial_record.py
-records from 2026-09-13 by reading the scene that ran: the y half-extent times
-two is the jaw-axis width.
+Why the offset is read from samples.csv and not from residual_*
+--------------------------------------------------------------
+residual_* in trial.json is target minus ground truth: the error the picker
+COMMANDED. What decides the grasp is the error the arm ACHIEVED. For y the two
+agree - over 308 paired trials, Pearson r = 0.954 and a median difference of
+-0.35mm - so the earlier residual-based criterion was measuring the right
+thing on that axis.
 
-Trials recorded before that carry the object only by geom NAME, and
-detector_z_bias - the one numeric clue - is half the object's HEIGHT plus the
-detector's 5.5mm surface offset. Height fixes the width only for a cube: the
-30x30x44mm cuboid the scene carried before 2026-09-11 has a 22mm half-height
-and a 30mm jaw-axis width. So for those, WIDTHS_MM below is an explicit lookup
-and unknown values are refused rather than guessed - this project has
-mis-applied a configuration-specific constant six times and guessing here
-would make seven. The report says which source each trial used.
+For x they do not: r = 0.686 with the achieved offset running about +6.15mm
+higher. Analyses built on residual_x were therefore wrong, and visibly so: five
+cl_cal_y288 trials recorded residual_x near +25mm and mostly succeeded, which
+supported a published claim that the pad width absorbs 25mm. Their achieved x
+offset was about +8mm. The open-loop x sweep, where the bias goes straight into
+the achieved offset, scores 0/20 at 24mm - the contradiction that exposed it.
+
+gripper_x minus object_x also carries a fixed geometric term, because the
+gripper link origin is not at the pad centre. It is measured here rather than
+assumed: the median offset among trials that are square in y and succeeded.
 
 Usage:
     python tools/experiments/analyse_jaw_criterion.py <batch dir> [<batch dir> ...]
 """
 
 import collections
+import csv
 import glob
+import statistics
 import json
 import math
 import os
@@ -46,6 +54,20 @@ import sys
 WIDTHS_MM = {0.0275: 30.0, 0.0155: 20.0, 0.0205: 30.0, 0.0305: 50.0}
 
 BINS_MM = [(0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, 30), (30, 1000)]
+
+# Trials this square in y are used to measure the fixed x term. They must be
+# successes, so the jaws demonstrably closed on the cube.
+BASELINE_EY_MM = 5.0
+
+# How much the fixed x term may vary across the baseline trials before it stops
+# deserving the name. Within one batch of one configuration it holds to about
+# 6mm; pooled across batches it spans 22mm.
+BASELINE_SPREAD_MAX_MM = 10.0
+
+# Provisional. The open-loop x sweep ran 24/32/40/48mm and every level scored
+# 0/20, so the knee is somewhere below 24mm and this bound is an upper limit,
+# not a measurement. The 8 and 16mm levels are what will pin it.
+X_BOUND_MM = 15.0
 
 # Failures that are not about where the jaws ended up. IK infeasibility is a
 # different mechanism and would otherwise be charged against the criterion.
@@ -70,6 +92,25 @@ def newcombe(k1, n1, k2, n2, z=1.96):
     return (d,
             d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2),
             d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2))
+
+
+def achieved_offset(trial_dir):
+    """gripper minus object, in mm, on the first frame of the close stage.
+
+    The first frame, because once the jaws move the cube the offset stops
+    describing where they met it.
+    """
+    path = os.path.join(trial_dir, "samples.csv")
+    try:
+        with open(path, newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                if row.get("stage") != "close":
+                    continue
+                return ((float(row["gripper_x"]) - float(row["object_x"])) * 1000.0,
+                        (float(row["gripper_y"]) - float(row["object_y"])) * 1000.0)
+    except (OSError, KeyError, ValueError):
+        return None
+    return None
 
 
 def load(roots):
@@ -100,24 +141,65 @@ def load(roots):
                 skipped["detector_z_bias %.4f not in WIDTHS_MM and no "
                         "object_half_extents_m recorded" % zbias] += 1
                 continue
+            achieved = achieved_offset(os.path.dirname(path))
+            if achieved is None:
+                skipped["no close-stage frame in samples.csv"] += 1
+                continue
             rows.append({
                 "batch": batch,
                 "trial": rec.get("trial_id", ""),
                 "clearance": round((2.0 * opening * 1000.0 - width) / 2.0, 1),
                 "width_source": source,
+                "raw_dx": achieved[0],
+                "ey": abs(achieved[1]),
                 "res_y": abs(meas["residual_y"]) * 1000.0,
                 "res_x": abs(meas.get("residual_x", 0.0)) * 1000.0,
                 "success": bool(rec.get("success")),
                 "category": rec.get("category", "?"),
             })
+
+    # The fixed x term, measured per clearance group rather than assumed: the
+    # gripper link origin is not at the pad centre, so an offset of zero error
+    # does not read as zero. Refuse to guess when there is nothing to measure
+    # it from.
+    for clearance in {r["clearance"] for r in rows}:
+        group = [r for r in rows if r["clearance"] == clearance]
+        square = [r["raw_dx"] for r in group
+                  if r["ey"] < BASELINE_EY_MM and r["success"]]
+        if len(square) < 5:
+            for r in group:
+                r["ex"] = None
+            skipped["clearance %.1fmm: only %d square successes, too few to "
+                    "measure the fixed x term" % (clearance, len(square))] += 1
+            continue
+        # The x term is only fixed within one batch. Measured per batch it
+        # ranges from -0.66mm (stage40_ceiling) to +21.58mm (stage52_cube20),
+        # and inside a single batch it spans as much as 33mm - because
+        # gripper_x is the link origin, not the pad centre, and where that
+        # origin sits relative to the pads depends on the whole arm pose, not
+        # just the commanded yaw. Subtracting a pooled median would absorb real
+        # error into the baseline, so refuse unless the spread is small enough
+        # that the term really is constant.
+        spread = max(square) - min(square)
+        if spread > BASELINE_SPREAD_MAX_MM:
+            for r in group:
+                r["ex"] = None
+            skipped["clearance %.1fmm: x baseline spans %.1fmm across %d square "
+                    "successes, so it is not a fixed term - |offset_x| refused"
+                    % (clearance, spread, len(square))] += 1
+            continue
+        base = statistics.median(square)
+        for r in group:
+            r["ex"] = abs(r["raw_dx"] - base)
+            r["x_base"] = base
     return rows, skipped
 
 
 def report_bins(rows, clearance):
     print("  %-11s %7s %7s %-15s  %s"
-          % ("|res_y|", "succ", "rate", "Wilson 95%", "failure forms"))
+          % ("|offset_y|", "succ", "rate", "Wilson 95%", "failure forms"))
     for lo, hi in BINS_MM:
-        cell = [r for r in rows if lo <= r["res_y"] < hi]
+        cell = [r for r in rows if lo <= r["ey"] < hi]
         if not cell:
             continue
         k, n = sum(1 for r in cell if r["success"]), len(cell)
@@ -131,12 +213,58 @@ def report_bins(rows, clearance):
                  ", ".join("%s x%d" % c for c in forms.most_common(3)) or "-"))
 
 
+def report_x_budget(rows, clearance):
+    """The second budget: how far off the pad axis the grasp survives.
+
+    Restricted to trials that are inside the y clearance, because past that
+    bound the y failure dominates and an x split would just be measuring it
+    again. The failure forms separate the two: no_contact means neither jaw
+    reached the cube, which is what running out of pad looks like.
+    """
+    inside_y = [r for r in rows if r["ey"] < clearance]
+    if len(inside_y) < 20:
+        print("  x budget: only %d trials inside the y clearance - no test"
+              % len(inside_y))
+        return
+    print("  within |offset_y| < %.1fmm, by |offset_x| (n=%d):"
+          % (clearance, len(inside_y)))
+    for lo, hi in BINS_MM:
+        cell = [r for r in inside_y if lo <= r["ex"] < hi]
+        if not cell:
+            continue
+        k, n = sum(1 for r in cell if r["success"]), len(cell)
+        wl, wh = wilson(k, n)
+        forms = collections.Counter(r["category"] for r in cell
+                                    if not r["success"])
+        label = "%d-%dmm" % (lo, hi) if hi < 1000 else ">=%dmm" % lo
+        print("    %-11s %3d/%-3d %6.1f%% [%3.0f%%,%3.0f%%]  %s"
+              % (label, k, n, 100.0 * k / n, wl * 100, wh * 100,
+                 ", ".join("%s x%d" % c for c in forms.most_common(3)) or "-"))
+
+
 def split(rows, clearance, label, drop_non_grasp):
+    """Test the y bound on trials that are inside the x bound.
+
+    Without that condition the test is not about y at all: the open-loop x
+    sweep puts 80 trials at a large x offset and a y offset near zero, so they
+    land in the innermost y bin and fail there, and the split comes out
+    backwards - 32.5% inside against 57.1% outside. Each bound has to be
+    tested where the other one is satisfied.
+    """
     used = [r for r in rows
             if not (drop_non_grasp and not r["success"]
                     and r["category"] in NON_GRASP_FAILURES)]
-    inside = [r for r in used if r["res_y"] < clearance]
-    outside = [r for r in used if r["res_y"] >= clearance]
+    if any(r.get("ex") is not None for r in used):
+        before = len(used)
+        used = [r for r in used
+                if r.get("ex") is not None and r["ex"] < X_BOUND_MM]
+        label += " (on the %d of %d inside |offset_x| < %gmm)" % (
+            len(used), before, X_BOUND_MM)
+    if not used:
+        print("  %s: nothing left after conditioning - no test" % label)
+        return
+    inside = [r for r in used if r["ey"] < clearance]
+    outside = [r for r in used if r["ey"] >= clearance]
     if not inside or not outside:
         print("  %s: one side is empty (%d in, %d out) - no test"
               % (label, len(inside), len(outside)))
@@ -176,7 +304,14 @@ def main():
         bs = sorted({r["batch"] for r in cell})
         print("\n=== clearance %.1f mm/side  (n=%d, batches: %s) ==="
               % (clearance, len(cell), ", ".join(bs)))
+        with_x = [r for r in cell if r.get("ex") is not None]
+        if with_x:
+            print("  fixed x term measured at %+.2f mm from %d square successes"
+                  % (with_x[0]["x_base"],
+                     sum(1 for r in cell
+                         if r["ey"] < BASELINE_EY_MM and r["success"])))
         report_bins(cell, clearance)
+        report_x_budget(with_x, clearance)
         split(cell, clearance, "split at the clearance, all trials", False)
         split(cell, clearance,
               "split at the clearance, non-grasp failures removed (%s)"
@@ -185,8 +320,26 @@ def main():
     # Pooled across clearances: the criterion is per-trial, so trials with
     # different clearances can be compared once each is judged against its own.
     print("\n=== pooled across clearances, each judged against its own ===")
-    inside = [r for r in rows if r["res_y"] < r["clearance"]]
-    outside = [r for r in rows if r["res_y"] >= r["clearance"]]
+    pool = rows
+    if any(r.get("ex") is not None for r in rows):
+        pool = [r for r in rows
+                if r.get("ex") is not None and r["ex"] < X_BOUND_MM]
+        print("  conditioned on |offset_x| < %gmm: %d of %d trials"
+              % (X_BOUND_MM, len(pool), len(rows)))
+    else:
+        # No trustworthy x measure, so the y test cannot be run where the
+        # x bound is satisfied. If any batch here varied x, its trials land
+        # in the innermost y bin and fail there, and the pooled y result is
+        # not about y. Say so rather than printing a contaminated number.
+        misses = sum(1 for r in rows if r["category"] == "no_contact")
+        print("  NOT conditioned on x: the baseline spread guard refused")
+        print("  an |offset_x| for every clearance group here, so this")
+        print("  pools y-varied and x-varied batches together. %d trials"
+              % misses)
+        print("  failed with no_contact, the x failure form - treat what")
+        print("  follows as contaminated and run one batch at a time.")
+    inside = [r for r in pool if r["ey"] < r["clearance"]]
+    outside = [r for r in pool if r["ey"] >= r["clearance"]]
     for label, group in (("inside its clearance", inside),
                          ("outside its clearance", outside)):
         if not group:

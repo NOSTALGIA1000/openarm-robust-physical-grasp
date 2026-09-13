@@ -1,0 +1,19 @@
+# Physics-mode grasp trial ol_x040_11
+
+- Result: `no_contact`
+- Success: `False`
+- Samples: `1302`
+- Max elevation: `0.0000 m` (threshold `0.020 m`)
+- Hold bilateral ratio: `0.000` (threshold `0.80`)
+- Max relative drift: `0.0000 m` (threshold `0.010 m`)
+
+## Stage times (simulation seconds)
+
+- `settle`: `14.800`
+- `hover`: `15.840`
+- `open`: `27.480`
+- `descend`: `28.680`
+- `close`: `32.000`
+- `retreat`: `37.680`
+
+No software attachment and no object pose command exist in this mode; object motion is produced only by contact.
