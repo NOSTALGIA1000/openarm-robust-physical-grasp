@@ -893,6 +893,20 @@ class PhysicsPicker(Node):
             self.get_logger().info(
                 "visual correction -> x={:.4f} y={:.4f} (bias cancelled)".format(x, y))
 
+        # Where the arm finally aimed, and where the object actually was -
+        # recorded whatever produced the target. Until 2026-09-13 this lived
+        # inside the relative-correction branch, so an OPEN-LOOP trial recorded
+        # no residual at all and could not be judged against the jaw-axis
+        # criterion (2026-09-13), which is stated per trial on residual_y. It
+        # also sat before pregrasp_redetect and visual_correction, either of
+        # which can move x,y afterwards, leaving a stale residual; both are off
+        # in every batch since stage44, so this changes no recorded value, but
+        # the number now means the final aim rather than an intermediate one.
+        self.recorder.record_measurement(
+            target_x=x, target_y=y,
+            ground_truth_x=gt_x, ground_truth_y=gt_y,
+            residual_x=x - gt_x, residual_y=y - gt_y)
+
         self.set_stage("open")
         if not self.send_gripper(self.config.open_position, -1.0):
             gripper_ok = False
