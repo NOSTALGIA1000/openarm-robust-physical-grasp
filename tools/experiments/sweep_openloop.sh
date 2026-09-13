@@ -37,9 +37,24 @@ source "$EXPDIR/env.sh"
 
 REPEATS="${REPEATS:-20}"
 FIRST="${FIRST:-1}"
-# Bracketing the 15mm clearance: one control, one inside, one just outside,
-# one well outside.
-BIASES="${BIASES:-0 8 16 24}"
+# Which axis the bias goes on. y is the jaw-closing direction, where the
+# budget is the per-side clearance; x is the pad-width direction, where the
+# budget is whatever the pads span and has never been measured.
+AXIS="${AXIS:-y}"
+case "$AXIS" in
+  # Bracketing the 15mm clearance: control, inside, just outside, well out.
+  y) BIASES="${BIASES:-0 8 16 24}" ;;
+  # The 2026-09-13 three-regime finding says res_x does not matter while
+  # res_y is inside the clearance - but it cannot not matter without limit,
+  # because at some x offset the jaws miss the cube entirely. That limit is
+  # the second budget and completes the two-dimensional picture. The old
+  # n=2 data puts it between 32 and 40mm (32mm 2/2, 40mm 0/2 no_contact),
+  # which these levels bracket. All are well inside the x kinematic limit
+  # of 112-128mm, so planning_failure should not appear; if it does, the
+  # run hit IK rather than the pads and the levels need lowering.
+  x) BIASES="${BIASES:-0 24 32 40}" ;;
+  *) echo "AXIS must be x or y, got '$AXIS'" >&2; exit 2 ;;
+esac
 OUTDIR="${OUTDIR:-stage54_openloop}"
 SIDE="${SIDE:-20}"
 export OPEN_POSITION="${OPEN_POSITION:-0.025}"
@@ -66,10 +81,11 @@ OFFY="${OFFY:--0.0007}"
 
 for m in $BIASES; do
   v=$(mm_to_m "$m")
-  echo "=== open loop, bias ${m}mm (clearance 15mm/side) ==="
+  if [ "$AXIS" = "x" ]; then bx="$v"; by="0.0000"; else bx="0.0000"; by="$v"; fi
+  echo "=== open loop, ${AXIS} bias ${m}mm (y clearance 15mm/side) ==="
   for r in $(seq "$FIRST" "$REPEATS"); do
-    bash "$EXPDIR/run_rel.sh" "$(printf 'ol_y%03d_%s' "$m" "$r")" \
-      0.0 "$v" "$OUTDIR" "$OFFX" "$OFFY" 2>&1 \
+    bash "$EXPDIR/run_rel.sh" "$(printf 'ol_%s%03d_%s' "$AXIS" "$m" "$r")" \
+      "$bx" "$by" "$OUTDIR" "$OFFX" "$OFFY" 2>&1 \
       | grep -E 'INSTABILITY|trial .* ->' | tail -2
   done
 done
