@@ -53,7 +53,26 @@ case "$AXIS" in
   # of 112-128mm, so planning_failure should not appear; if it does, the
   # run hit IK rather than the pads and the levels need lowering.
   x) BIASES="${BIASES:-0 24 32 40}" ;;
-  *) echo "AXIS must be x or y, got '$AXIS'" >&2; exit 2 ;;
+  # Both axes at once, x = y = d, to ask whether the two budgets are
+  # independent. Measured singles: y 90/90/85/26% and x -/100/80/0% at
+  # 0/8/16/24mm. Two models, and the levels are chosen where they part:
+  #
+  #   rectangular  the budgets are separate and the failures multiply, so
+  #                P(d) = P_y(d) * P_x(d)
+  #   radial       there is one joint budget on hypot(d,d) = d*sqrt(2), so
+  #                P(d) = P_single(d*1.414)
+  #
+  #   d= 8  hypot 11.3   rectangular 90%   radial ~88%   control, agree
+  #   d=16  hypot 22.6   rectangular 68%   radial 10-40%
+  #   d=20  hypot 28.3   rectangular ~22%  radial ~0%
+  #
+  # d=12 is deliberately absent: hypot 17.0 puts both models near 80% and
+  # n=20 cannot separate them, so it would cost an hour and settle nothing.
+  #
+  # Both components positive. Opposite signs are not tested and the result
+  # does not speak to them.
+  xy) BIASES="${BIASES:-8 16 20}" ;;
+  *) echo "AXIS must be x, y or xy, got '$AXIS'" >&2; exit 2 ;;
 esac
 OUTDIR="${OUTDIR:-stage54_openloop}"
 SIDE="${SIDE:-20}"
@@ -81,8 +100,12 @@ OFFY="${OFFY:--0.0007}"
 
 for m in $BIASES; do
   v=$(mm_to_m "$m")
-  if [ "$AXIS" = "x" ]; then bx="$v"; by="0.0000"; else bx="0.0000"; by="$v"; fi
-  echo "=== open loop, ${AXIS} bias ${m}mm (y clearance 15mm/side) ==="
+  case "$AXIS" in
+    x)  bx="$v";      by="0.0000" ;;
+    y)  bx="0.0000";  by="$v" ;;
+    xy) bx="$v";      by="$v" ;;
+  esac
+  echo "=== open loop, ${AXIS} bias ${m}mm (bx=$bx by=$by) ==="
   for r in $(seq "$FIRST" "$REPEATS"); do
     bash "$EXPDIR/run_rel.sh" "$(printf 'ol_%s%03d_%s' "$AXIS" "$m" "$r")" \
       "$bx" "$by" "$OUTDIR" "$OFFX" "$OFFY" 2>&1 \
