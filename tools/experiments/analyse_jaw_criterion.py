@@ -7,12 +7,20 @@ object, opening and date and splitting each trial on the offset between the
 gripper and the object at the moment the jaws start closing.
 
     succeed  <==  |offset_y| < (2 * open_position * 1000 - width_mm) / 2
-                  and |offset_x| < the pad span
+                  and |offset_x| < 16-24mm, measured rather than derived
 
 The first bound is the per-side clearance. Staying inside it is sufficient,
 not necessary - crossing it does not guarantee failure - and the two axes fail
 differently: past the y bound one jaw still touches (unilateral_contact), past
 the x bound neither does (no_contact).
+
+The two bounds turned out to be the same size. Open loop at n=20 per cell,
+where the bias reaches the achieved offset directly: y scores 17/20 at 16mm
+and 5/19 at 24mm, x scores 16/20 at 16mm and 0/20 at 24mm. The axes are
+indistinguishable at 8mm and at 16mm and separate only at 24mm, where x has
+collapsed and y has not. So the older claim that the pads forgive more than
+the jaws is withdrawn: they forgive the same amount, and past the bound x is
+the harsher of the two.
 
 Why the offset is read from samples.csv and not from residual_*
 --------------------------------------------------------------
@@ -64,10 +72,13 @@ BASELINE_EY_MM = 5.0
 # 6mm; pooled across batches it spans 22mm.
 BASELINE_SPREAD_MAX_MM = 10.0
 
-# Provisional. The open-loop x sweep ran 24/32/40/48mm and every level scored
-# 0/20, so the knee is somewhere below 24mm and this bound is an upper limit,
-# not a measurement. The 8 and 16mm levels are what will pin it.
-X_BOUND_MM = 15.0
+# Measured 2026-09-14 by the open-loop x sweep, n=20 per cell: 8mm 20/20,
+# 16mm 16/20, 24mm 0/20, and 0/20 again at 32, 40 and 48mm. So the x bound
+# lies between 16 and 24mm - the same interval as the y clearance, which the
+# y sweep put at 16mm 17/20 against 24mm 5/19. 16 is the largest level still
+# measured good on both axes, so conditioning at 16 keeps every trial that is
+# demonstrably inside the bound and excludes the untested 16-24mm band.
+X_BOUND_MM = 16.0
 
 # Failures that are not about where the jaws ended up. IK infeasibility is a
 # different mechanism and would otherwise be charged against the criterion.
