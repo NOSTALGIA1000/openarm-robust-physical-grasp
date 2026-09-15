@@ -88,6 +88,18 @@ python3 -m pytest tests -q
 
 - **两处记录缺陷已修**：`model_sha256` 此前硬编码 `table_scene_physics.xml`，而三个变体场景批次实际跑的是 `PHYSICS_SCENE` 指定的场景——**记录里的校验和属于一个没被用到的文件**，比没有校验和更糟，因为它读起来像是场景已被锁定。现在哈希实际场景并另存 `environment.scene`。同时把物体半尺寸写进 `environment.object_half_extents_m`（解析实际场景），因为 `detector_z_bias` 只给半**高**，对 30×30×44 长方体无法推出夹爪方向宽度。两条路径已用合成数据交叉验证给出同一余隙。
 
+- **联合容忍区域既不是乘积、也不是任何对称形状**（`stage54_openloop` 扩至 **400 目录 / 399 次有效**，二十格各 n=20，零发散，399/399 `sim_time` 严格单调）。开环，偏置直接进接近偏移，测的是几何本身。
+
+- **两轴预算不独立**：各偏 12mm（单轴各约 90%）联合只剩 **10/20 = 50%**，各偏 16mm（各 80–85%）只剩 **1/20 = 5%**。乘积模型在 d=12（−0.300 [−0.534, −0.005]）与 d=16（**−0.650 [−0.810, −0.363]**）两格被推翻。d=8 对照 **20/20**，排除「同时命令两轴」本身的影响。
+
+- **联合区域不对称，对称度量整族出局**：**(x=8, y=20) 为 16/20 = 80%，(x=20, y=8) 为 0/20**，差 **+0.800 [+0.531, +0.919]**。两格的 hypot 都是 21.4mm、L1 都是 27.8mm——**同一半径，一个 80% 一个全灭**。hypot、L1 及任何单一半径度量一次淘汰，"该用 y 曲线还是 x 曲线换算"的争论随之消失（那前提本身已被推翻）。形态也分开：(8,20) 是 `excessive_slip` 4（咬住但滑脱），(20,8) 是 `unilateral_contact` 17（钳口错开）。
+
+- **两轴响应曲线形状不同**（加密 18/21mm 后）：y 是**平台加断崖**（16mm 85%、18mm **95%**、21mm 75%、24mm 26%），x 是**匀速下滑**（16mm 80%、18mm **55%**、21mm **0%**）。半失效点 y 约 **22mm**、x 约 **18mm**，**x 的预算小约 4mm**。这修正了 09-14 那条「两轴预算都是 16–24mm、不可区分」——16mm 处确实不可区分，之后分道扬镳；当时每轴在该区间只有一个点。
+
+- **支撑这一切的测量修过一次**：偏移原先读闭合时刻，但大 y 偏置下夹爪下降途中会推动方块（`ol_y024` 推了 x 6.8mm/y 5.4mm，`ol_xy020` 推了 y 4.0mm，其余十八格 0.02mm）。**方块在读数前已被推近夹爪，该偏移遂成内生变量**。`ol_y024` 按闭合时刻读是 (10.3, 18.1)mm，按方块初始位置读是 **(2.0, 23.0)**。`achieved()` 现按首帧位置测并返回方块位移量。
+
+- **真机协议随之更新**：x 安全 ≤8mm、半失效约 18mm、**21mm 硬归零**；y 安全 ≤18mm、半失效约 22mm。**若只能保一个方向，保 x。**更要紧的是**两轴误差必须一起算**——各自达标不等于联合达标。
+
 - **两轴预算都是 16–24mm，而各向异性的方向和我先前写的相反**（`stage54_openloop` 补完 x 向六档，200 目录 / **199 次有效**，零发散，199/199 `sim_time` 严格单调）。开环 n=20/格：x 向 8mm **20/20**、16mm 16/20、**24mm 0/20**、32/40/48mm 全为 0/20；y 向 8mm 18/20、16mm 17/20、24mm 5/19。同偏置下两轴 8mm 与 16mm **不可区分**（[−0.301,+0.077]、[−0.192,+0.287]），**24mm 可区分**（+0.263 [+0.046,+0.488]）。**两轴预算相当，越界后 x 塌得更彻底**——形态上 x 越界是 `no_contact`（两侧皆空，无补救），y 越界是 `unilateral_contact`（一侧仍接触）。
 
 - **旧的「x 比 y 宽容（32–40mm vs 24–32mm）」被推翻**，且旧数据从未支持过它：那来自 `px032` 的 2/2，**Wilson 下界 34%**，与本批 16mm 的 80% 和 24mm 的 0% 都相容——只是没有功效。
@@ -190,7 +202,7 @@ python3 -m pytest tests -q
 
 标定容差远高于静态几何推算，源于**自定心**——先接触的手指把物体沿桌面推向夹爪中心；失效实际发生在下降时手指撞到物体处，而非夹持几何容差处。
 
-结论文档：[两轴预算](docs/results/2026-09-14-openarm-two-axis-budget.md) · [开环基线](docs/results/2026-09-13-openarm-openloop-baseline.md) · [夹爪轴判据](docs/results/2026-09-13-openarm-jaw-axis-criterion.md) · [失效形态](docs/results/2026-09-12-openarm-degradation-shape.md) · [20mm 噪声](docs/results/2026-09-12-openarm-cube20-noise.md) · [20mm 方块](docs/results/2026-09-11-openarm-cube20.md) · [offset 轴向](docs/results/2026-09-11-openarm-offset-axis.md) · [消融](docs/results/2026-09-11-openarm-ablation.md) · [深度噪声](docs/results/2026-09-10-openarm-depth-noise.md) · [余隙配对检验](docs/results/2026-09-10-openarm-clearance-paired.md) · [余隙扫描与抬升耦合](docs/results/2026-09-09-openarm-clearance-and-lift-coupling.md) · [ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
+结论文档：[联合容忍区域](docs/results/2026-09-15-openarm-joint-offset-region.md) · [两轴预算](docs/results/2026-09-14-openarm-two-axis-budget.md) · [开环基线](docs/results/2026-09-13-openarm-openloop-baseline.md) · [夹爪轴判据](docs/results/2026-09-13-openarm-jaw-axis-criterion.md) · [失效形态](docs/results/2026-09-12-openarm-degradation-shape.md) · [20mm 噪声](docs/results/2026-09-12-openarm-cube20-noise.md) · [20mm 方块](docs/results/2026-09-11-openarm-cube20.md) · [offset 轴向](docs/results/2026-09-11-openarm-offset-axis.md) · [消融](docs/results/2026-09-11-openarm-ablation.md) · [深度噪声](docs/results/2026-09-10-openarm-depth-noise.md) · [余隙配对检验](docs/results/2026-09-10-openarm-clearance-paired.md) · [余隙扫描与抬升耦合](docs/results/2026-09-09-openarm-clearance-and-lift-coupling.md) · [ECL 伺服基线对比](docs/results/2026-09-09-openarm-ecl-servo-baseline.md) · [上限即视场](docs/results/2026-09-08-openarm-ceiling-is-the-field-of-view.md) · [上限复测](docs/results/2026-09-08-openarm-ceiling-retest.md) · [视角相关修正](docs/results/2026-09-06-openarm-view-angle-correction.md) · [清洁读数下无标定常数](docs/results/2026-09-06-openarm-offset-is-not-a-constant.md) · [`rel_offset` 几何假设](docs/results/2026-09-06-openarm-rel-offset-geometry.md)（**已否证**，见上）
 
 前身阶段（**离线 MuJoCo 框架，装置与任务均与现行 ROS2 流程不同，结论不可直接迁移**）：[接触鲁棒性网格](docs/results/2026-08-12-contact-robustness-grid.md)（630 次配对种子，**全仓库唯一带 Wilson 置信区间的批次**，其自带的「Supported / Unsupported Claims」分节是本项目措辞规范的来源） · [逐步接触冒烟](docs/results/2026-08-13-per-step-contact-smoke.md) · [稳定性筛查](docs/results/2026-08-22-simulation-grasp-stability.md)（**唯一记录了环境块与场景 SHA-256 的批次**） · [接触形成诊断](docs/results/2026-09-01-openarm-contact-formation-diagnostics.md) · [接触面几何诊断](docs/results/2026-09-01-openarm-contact-surface-geometry-diagnosis.md)
 

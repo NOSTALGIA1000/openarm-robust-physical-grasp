@@ -5,6 +5,8 @@
 配置：20mm 方块，`open_position=0.025`（y 每侧余隙 15.0mm），`RELATIVE_CORRECTION=false`，与修正臂逐字段相同
 脚本：`tools/experiments/sweep_openloop.sh`（`AXIS=x|y`）、`tools/experiments/analyse_jaw_criterion.py`
 
+> **2026-09-15 修正**：本文说「两轴预算都在 16–24mm 之间，16mm 内不可区分」。加密到 18/21mm 后：**16mm 处确实不可区分（85% 对 80%），越过之后分道扬镳**——y 在 18mm 仍有 95%、21mm 才掉到 75%；x 在 18mm 已是 55%、21mm 归零。半失效点 y 约 22mm、x 约 18mm，**x 的预算小约 4mm**。当时每轴在 16–24mm 之间只有一个点，两条曲线因此看着平行，实则一条是平台加断崖、另一条是匀速下滑。完整的二十格与联合区域结论见 [联合容忍区域](2026-09-15-openarm-joint-offset-region.md)。
+
 ---
 
 ## 1. 两条曲线
