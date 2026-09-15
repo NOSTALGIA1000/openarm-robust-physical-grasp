@@ -72,7 +72,16 @@ case "$AXIS" in
   # Both components positive. Opposite signs are not tested and the result
   # does not speak to them.
   xy) BIASES="${BIASES:-8 16 20}" ;;
-  *) echo "AXIS must be x, y or xy, got '$AXIS'" >&2; exit 2 ;;
+  # Off the diagonal, to test whether the joint region is symmetric at
+  # all. Every single-metric model - hypot, L1, anything on one radius -
+  # requires (ex, ey) and (ey, ex) to score the same. Rectangular does
+  # not: with the measured curves it puts x=8,y=20 at P_x(8)*P_y(20) =
+  # 1.00*0.75 = 75%, and x=20,y=8 at P_x(20)*P_y(8) = 0.18*0.90 = 16%.
+  #
+  # The two cells agreeing kills rectangular again; the two differing
+  # kills every symmetric metric at once. PAIRS is "bx:by" in mm.
+  pair) PAIRS="${PAIRS:-8:20 20:8}" ;;
+  *) echo "AXIS must be x, y, xy or pair, got '$AXIS'" >&2; exit 2 ;;
 esac
 OUTDIR="${OUTDIR:-stage54_openloop}"
 SIDE="${SIDE:-20}"
@@ -98,6 +107,19 @@ set -a; . "$OPENARM_MODEL/${scene%.xml}.env"; set +a
 OFFX="${OFFX:--0.0209}"
 OFFY="${OFFY:--0.0007}"
 
+if [ "$AXIS" = "pair" ]; then
+  for p in $PAIRS; do
+    mx="${p%%:*}"; my="${p##*:}"
+    bx=$(mm_to_m "$mx"); by=$(mm_to_m "$my")
+    echo "=== open loop, pair x=${mx}mm y=${my}mm (bx=$bx by=$by) ==="
+    for r in $(seq "$FIRST" "$REPEATS"); do
+      bash "$EXPDIR/run_rel.sh" \
+        "$(printf 'ol_p%02dx%02d_%s' "$mx" "$my" "$r")" \
+        "$bx" "$by" "$OUTDIR" "$OFFX" "$OFFY" 2>&1 \
+        | grep -E 'INSTABILITY|trial .* ->' | tail -2
+    done
+  done
+else
 for m in $BIASES; do
   v=$(mm_to_m "$m")
   case "$AXIS" in
@@ -112,5 +134,6 @@ for m in $BIASES; do
       | grep -E 'INSTABILITY|trial .* ->' | tail -2
   done
 done
+fi
 unset PHYSICS_SCENE REHOVER DETECTOR_ROI_CASCADE RELATIVE_CORRECTION
 echo OPENLOOP_DONE
