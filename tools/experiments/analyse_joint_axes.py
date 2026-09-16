@@ -51,7 +51,14 @@ import sys
 # ol_xy008_1 as well as ol_x024_7 and ol_y016_3. The narrower ol_([xy])(\d+)
 # silently dropped every joint trial: it matched the x and then met a y where
 # it wanted a digit.
-TRIAL = re.compile(r"ol_(xy|x|y)(\d+)_\d+$")
+#
+# rel_ is the corrected arm (sweep_rel_jaw.sh), read by the same code on
+# purpose: measuring both pipelines with one ruler is the whole point of the
+# jaw-centre telemetry. Note that for rel_ the number in the trial id is the
+# CAMERA bias, which the correction is supposed to remove - it is not the
+# achieved offset and must not be read as one. Only the measured offset below
+# is comparable between the two.
+TRIAL = re.compile(r"(?:ol|rel)_(xy|x|y)(\d+)_\d+$")
 
 # No hardcoded baseline. It is measured per batch by measure_baseline() from
 # that batch's own zero-bias successes, because it differs by reference and by
