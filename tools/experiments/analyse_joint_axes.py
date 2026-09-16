@@ -16,9 +16,10 @@ are off at once, x = y = d, which separates three shapes for the joint region:
 
 Predictions are computed from the approach offset, not the commanded bias
 ------------------------------------------------------------------------
-Each cell's offset is measured rather than assumed, with the per-axis
-geometric baseline subtracted: dx carries +7.67mm and dy +1.50mm at zero bias,
-from this batch's own zero-bias cells where the baseline holds to about 3mm.
+Each cell's offset is measured rather than assumed, with the geometric
+baseline subtracted - and that baseline is itself measured, from the batch's
+own zero-bias successes. A batch without a zero-bias cell is refused rather
+than given a borrowed constant.
 
 It is measured against the cube's ORIGINAL position, not its position when the
 jaws close - see achieved() for why. At large y bias the gripper shoves the
@@ -52,11 +53,11 @@ import sys
 # it wanted a digit.
 TRIAL = re.compile(r"ol_(xy|x|y)(\d+)_\d+$")
 
-# gripper minus object at zero bias, measured from this batch's own ol_y000
-# cell. The gripper link origin is not at the pad centre, so a perfect grasp
-# does not read as zero.
-BASELINE_DX_MM = 7.67
-BASELINE_DY_MM = 1.50
+# No hardcoded baseline. It is measured per batch by measure_baseline() from
+# that batch's own zero-bias successes, because it differs by reference and by
+# pipeline: +7.66mm in x from the link origin on stage54_openloop, +10.71mm
+# from the jaw centre on stage56_jaw, and +21.45mm from the link origin on the
+# corrected pipeline. A constant written here would be right for one batch.
 
 
 def wilson(k, n, z=1.96):
@@ -134,11 +135,39 @@ def achieved(trial_dir):
             float(close["object_y"]) - float(first["object_y"])) * 1000.0
     except (KeyError, ValueError):
         return None
-    # The geometric baseline exists because the link origin is not the jaw
-    # centre. Measured from the jaws there is nothing to subtract.
-    if from_jaw:
-        return (abs(dx), abs(dy), moved)
-    return (abs(dx - BASELINE_DX_MM), abs(dy - BASELINE_DY_MM), moved)
+    return (dx, dy, moved, from_jaw)
+
+
+def measure_baseline(trial_dirs, successes_only=True):
+    """The geometric term, measured from a batch's own zero-bias successes.
+
+    A perfect grasp does not read as zero on either reference. The link origin
+    is not the jaw centre, so gripper_* carries a pose-dependent offset. And
+    the jaw centre is the midpoint of the two fingers while they are still
+    OPEN on the first close frame, so it is not yet the contact point either:
+    measured on stage56_jaw's zero-bias cell it sits +10.56mm out in x and
+    +1.13mm in y.
+
+    The first version of this function subtracted nothing on the jaw path, on
+    the reasoning that measuring from the jaws leaves nothing to subtract. That
+    was wrong, and it put ol_y024 at ex 15.01mm when the honest figure is about
+    4.5mm - thirteen millimetres of x error that came from the arithmetic
+    rather than the arm. What the jaw centre actually fixes is that its term
+    does NOT drift with the approach pose: 10.56mm at zero bias and 10.46mm at
+    16mm of y, against 7.65 and 21.45 for the link origin between two
+    pipelines. A constant can be subtracted; drift cannot.
+
+    So it is measured, never assumed, and measured per batch.
+    """
+    values = []
+    for trial_dir in trial_dirs:
+        offset = achieved(trial_dir)
+        if offset is None:
+            continue
+        values.append(offset)
+    if len(values) < 5:
+        return None
+    return (median([v[0] for v in values]), median([v[1] for v in values]))
 
 
 def response(curve, offset):
@@ -172,14 +201,40 @@ def cell_offsets(out):
 def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
-    cells = collections.defaultdict(list)
+    raw = collections.defaultdict(list)
+    zero_dirs = []
     for path in sorted(glob.glob(os.path.join(sys.argv[1], "*", "trial.json"))):
         rec = json.loads(open(path, encoding="utf-8").read())
         m = TRIAL.match(rec.get("trial_id", ""))
         if not m:
             continue
-        cells[(m.group(1), int(m.group(2)))].append(
-            (rec.get("category", "?"), achieved(os.path.dirname(path))))
+        trial_dir = os.path.dirname(path)
+        key = (m.group(1), int(m.group(2)))
+        raw[key].append((rec.get("category", "?"), achieved(trial_dir)))
+        if key[1] == 0 and rec.get("success"):
+            zero_dirs.append(trial_dir)
+
+    # Measured from this batch's own zero-bias successes, never assumed and
+    # never carried over from another batch. Without a zero-bias cell there is
+    # nothing to measure it from, and guessing is how the last two x results
+    # went wrong.
+    base = measure_baseline(zero_dirs)
+    if base is None:
+        print("no zero-bias cell with at least 5 successes in %s - the "
+              "geometric baseline cannot be measured and offsets would be "
+              "wrong by an unknown constant. Refusing." % sys.argv[1])
+        return 1
+    from_jaw = any(o[3] for out in raw.values() for _, o in out if o)
+    print("geometric baseline measured from %d zero-bias successes: "
+          "dx %+.2fmm, dy %+.2fmm  (reference: %s)"
+          % (len(zero_dirs), base[0], base[1],
+             "jaw centre" if from_jaw else "gripper link origin"))
+    print("")
+
+    cells = {key: [(c, None if o is None
+                    else (abs(o[0] - base[0]), abs(o[1] - base[1]), o[2]))
+                   for c, o in out]
+             for key, out in raw.items()}
 
     curves = {}
     for axis in ("y", "x"):
