@@ -418,6 +418,13 @@ class PhysicsPicker(Node):
                 if summary.bilateral:
                     self._hold_bilateral += 1
 
+            # NaN rather than zero when the simulator could not supply it:
+            # zero is a real place in the workspace and would be averaged in
+            # silently, while NaN propagates and shows up.
+            jaw_xyz = ((msg.jaw_centre.x, msg.jaw_centre.y, msg.jaw_centre.z)
+                       if getattr(msg, "jaw_centre_valid", False)
+                       else (float("nan"), float("nan"), float("nan")))
+
             self._summary = summary
             self.recorder.add_sample(
                 Sample(
@@ -437,6 +444,9 @@ class PhysicsPicker(Node):
                     gripper_x=gripper_xyz[0],
                     gripper_y=gripper_xyz[1],
                     gripper_z=gripper_xyz[2],
+                    jaw_x=jaw_xyz[0],
+                    jaw_y=jaw_xyz[1],
+                    jaw_z=jaw_xyz[2],
                     elevation=height,
                     drift=drift,
                 )

@@ -47,6 +47,14 @@ def generate_launch_description():
             {"camera_period": 0.1666666667},
             {"grasp_telemetry.object_geom": "physics_object_geom"},
             {"grasp_telemetry.gripper_body": "openarm_left_hand"},
+            # The jaws meet midway between these two, which is the only
+            # reference an offset can be measured from and still mean the
+            # same thing in a different approach pose. gripper_body above
+            # is the link origin and does not.
+            {"grasp_telemetry.left_finger_geom":
+                "openarm_left_left_finger_collision"},
+            {"grasp_telemetry.right_finger_geom":
+                "openarm_left_right_finger_collision"},
             {"grasp_telemetry.publish_every_n_steps": 10},
         ],
     )

@@ -34,6 +34,16 @@ class Sample:
     gripper_x: float
     gripper_y: float
     gripper_z: float
+    # Midpoint of the two finger collision geoms - where the jaws meet. The
+    # gripper_* above is the link origin, whose offset from the jaws depends on
+    # the whole arm pose: measured at zero bias it is +7.65mm in x for the
+    # open-loop pipeline and +21.45mm for the corrected one, so an x offset
+    # taken from it cannot be compared across pipelines, arms or approach
+    # poses. NaN on trials recorded before 2026-09-16 or when the telemetry
+    # could not find the finger geoms.
+    jaw_x: float
+    jaw_y: float
+    jaw_z: float
     elevation: float
     drift: float
 

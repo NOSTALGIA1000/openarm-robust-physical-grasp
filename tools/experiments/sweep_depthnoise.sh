@@ -28,7 +28,13 @@ export LIFT_COMMAND_M="${LIFT_COMMAND_M:-0.050}"
 python3 "$EXPDIR/make_object_variants.py" \
   "$OPENARM_MODEL/table_scene_physics.xml" "$OPENARM_MODEL" "$SIDE" || exit 6
 scene=$(printf "table_scene_c%03d.xml" "$SIDE")
-cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
+# The rebuild of 2026-09-16 made colcon symlink each installed model file
+# back to src, so this copy became a file onto itself and cp refused,
+# taking the sweep down with it. Skip when they already resolve to the
+# same file; still copy when the install holds a real separate copy.
+if [ "$(readlink -f "$OPENARM_MODEL/$scene")" != "$(readlink -f "$OPENARM_SHARE/model/$scene" 2>/dev/null)" ]; then
+  cp "$OPENARM_MODEL/$scene" "$OPENARM_SHARE/model/$scene" || exit 6
+fi
 export PHYSICS_SCENE="$scene"
 # Derived values come from the generator's sidecar, so the rules that
 # produce them live in one file. Restating them here is how three

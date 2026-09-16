@@ -42,7 +42,8 @@ cd "$ROOT/vm_sync/ros2_course_physics/src"
 # silently reverted - which is how the Apache-2.0 headers added on
 # 2026-09-13 came back stripped.
 find . \( -name '*.py' -o -name '*.xml' -o -name '*.yaml' -o -name '*.urdf' -o -name '*.srdf' \
-         -o -name '*.cpp' -o -name '*.hpp' -o -name 'CMakeLists.txt' \) | while read -r rel; do
+         -o -name '*.cpp' -o -name '*.hpp' -o -name 'CMakeLists.txt' \
+         -o -name '*.msg' -o -name '*.srv' \) | while read -r rel; do
   rel="${rel#./}"
   ssh -n -p "$PORT" "$VM" "test -e ~/$WS/$rel" || { echo "  skip (not on VM): $rel"; continue; }
   # Compare before sending, and only for the files that need a build: a
@@ -50,7 +51,8 @@ find . \( -name '*.py' -o -name '*.xml' -o -name '*.yaml' -o -name '*.urdf' -o -
   # is hashed after CR stripping so line endings do not register as a
   # difference.
   case "$rel" in
-    *.cpp|*.hpp|*/CMakeLists.txt|CMakeLists.txt)
+    # .msg and .srv regenerate headers, so they need a build too.
+    *.cpp|*.hpp|*.msg|*.srv|*/CMakeLists.txt|CMakeLists.txt)
       lh=$(tr -d '\r' < "$rel" | sha256sum | cut -d' ' -f1)
       rh=$(ssh -n -p "$PORT" "$VM" "sha256sum ~/$WS/$rel 2>/dev/null | cut -d' ' -f1")
       [ "$lh" = "$rh" ] || echo "$rel" >> "$TMP/rebuild" ;;

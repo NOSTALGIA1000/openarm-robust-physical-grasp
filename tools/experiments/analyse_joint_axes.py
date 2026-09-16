@@ -108,15 +108,36 @@ def achieved(trial_dir):
     close = next((r for r in rows if r.get("stage") == "close"), None)
     if close is None:
         return None
+    # jaw_x/jaw_y when the record has them (2026-09-16 onward): the midpoint of
+    # the two finger geoms, which is where the jaws meet. Falling back to
+    # gripper_x/y means the link origin, whose offset from the jaws depends on
+    # the approach pose - at zero bias it sits +7.65mm out in x for the
+    # open-loop pipeline and +21.45mm for the corrected one, so offsets taken
+    # from it are not comparable across pipelines and the baseline below has to
+    # be re-measured per batch.
+    def pick(axis):
+        key = "jaw_" + axis
+        if key in close:
+            value = close[key]
+            if value not in ("", "nan", "NaN"):
+                return float(value), True
+        return float(close["gripper_" + axis]), False
+
     try:
         first = rows[0]
-        dx = (float(close["gripper_x"]) - float(first["object_x"])) * 1000.0
-        dy = (float(close["gripper_y"]) - float(first["object_y"])) * 1000.0
+        gx, from_jaw = pick("x")
+        gy, _ = pick("y")
+        dx = (gx - float(first["object_x"])) * 1000.0
+        dy = (gy - float(first["object_y"])) * 1000.0
         moved = math.hypot(
             float(close["object_x"]) - float(first["object_x"]),
             float(close["object_y"]) - float(first["object_y"])) * 1000.0
     except (KeyError, ValueError):
         return None
+    # The geometric baseline exists because the link origin is not the jaw
+    # centre. Measured from the jaws there is nothing to subtract.
+    if from_jaw:
+        return (abs(dx), abs(dy), moved)
     return (abs(dx - BASELINE_DX_MM), abs(dy - BASELINE_DY_MM), moved)
 
 

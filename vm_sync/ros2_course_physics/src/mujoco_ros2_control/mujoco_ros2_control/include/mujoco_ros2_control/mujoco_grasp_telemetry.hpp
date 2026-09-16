@@ -47,6 +47,11 @@ private:
   int object_geom_id_{-1};
   int object_body_id_{-1};
   int gripper_body_id_{-1};
+  // The two finger collision geoms. Their midpoint is where the jaws meet,
+  // which is what an offset has to be measured from if it is to mean the same
+  // thing in different approach poses - the link origin does not.
+  int left_finger_geom_id_{-1};
+  int right_finger_geom_id_{-1};
   int publish_every_n_steps_{10};
   int step_counter_{0};
 };

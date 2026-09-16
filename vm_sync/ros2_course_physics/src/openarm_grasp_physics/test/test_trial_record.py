@@ -40,6 +40,9 @@ def make_sample(sim_time, stage="hold"):
         gripper_x=0.30,
         gripper_y=0.0,
         gripper_z=0.55,
+        jaw_x=0.30,
+        jaw_y=0.0,
+        jaw_z=0.49,
         elevation=0.024,
         drift=0.003,
     )
