@@ -60,11 +60,10 @@ import sys
 # is comparable between the two.
 TRIAL = re.compile(r"(?:ol|rel)_(xy|x|y)(\d+)_\d+$")
 
-# No hardcoded baseline. It is measured per batch by measure_baseline() from
-# that batch's own zero-bias successes, because it differs by reference and by
-# pipeline: +7.66mm in x from the link origin on stage54_openloop, +10.71mm
-# from the jaw centre on stage56_jaw, and +21.45mm from the link origin on the
-# corrected pipeline. A constant written here would be right for one batch.
+# No hardcoded baseline. It is measured per batch by measure_baseline(), which
+# takes it from jaw minus the commanded target - see arm_term(). A constant
+# written here would be right for one reference frame: the same batches read
+# +10.27mm in x from the jaw centre and +6.72mm from the link origin.
 
 
 def wilson(k, n, z=1.96):
@@ -145,7 +144,60 @@ def achieved(trial_dir):
     return (dx, dy, moved, from_jaw)
 
 
-def measure_baseline(trial_dirs, successes_only=True):
+def arm_term(trial_dir):
+    """(dx, dy) in mm from the commanded target to where the jaws ended up.
+
+    The trial record carries the target the picker finally sent, so the total
+    offset splits into two terms that mean different things:
+
+        jaw - object  =  (jaw - target)  +  (target - object)
+
+    The second is the aim - what the detector and whatever correction is
+    applied got wrong. The first is the arm: finger geometry plus the
+    controller's tracking error, with no detector in it at all. Measured on
+    2026-09-17 it is +9.15 to +10.21mm in x and -0.09 to -1.05mm in y across
+    all six cells of stage56_jaw, which span 0 to 24mm of y bias and 0 to 21mm
+    of x bias, and +9.42 / +0.12 on the corrected pipeline. It does not move
+    with the bias and it does not move with the pipeline.
+
+    That is what makes it the right thing to subtract. A batch's zero-bias
+    median contains this term AND that pipeline's own systematic aiming error,
+    so subtracting the median removes the error along with the geometry - and
+    the error is the quantity under study. On stage57_reljaw the two differ by
+    7.2mm in x, all of it aim.
+    """
+    try:
+        rec = json.loads(open(os.path.join(trial_dir, "trial.json"),
+                              encoding="utf-8").read())
+    except (OSError, ValueError):
+        return None
+    meas = rec.get("measurements") or {}
+    if "target_x" not in meas or "target_y" not in meas:
+        return None
+    try:
+        with open(os.path.join(trial_dir, "samples.csv"), newline="",
+                  encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+    except OSError:
+        return None
+    close = next((r for r in rows if r.get("stage") == "close"), None)
+    if close is None:
+        return None
+
+    def pick(axis):
+        key = "jaw_" + axis
+        if key in close and close[key] not in ("", "nan", "NaN"):
+            return float(close[key])
+        return float(close["gripper_" + axis])
+
+    try:
+        return ((pick("x") - float(meas["target_x"])) * 1000.0,
+                (pick("y") - float(meas["target_y"])) * 1000.0)
+    except (KeyError, ValueError):
+        return None
+
+
+def measure_baseline(all_dirs, zero_dirs):
     """The geometric term, measured from a batch's own zero-bias successes.
 
     A perfect grasp does not read as zero on either reference. The link origin
@@ -165,16 +217,24 @@ def measure_baseline(trial_dirs, successes_only=True):
     pipelines. A constant can be subtracted; drift cannot.
 
     So it is measured, never assumed, and measured per batch.
+
+    It is now measured from arm_term() over every trial in the batch rather
+    than from the zero-bias cell, for the reason given there: the zero-bias
+    median also contains the pipeline's own aiming error. The zero-bias path is
+    kept as a fallback for records written before target_x was stored, and the
+    caller is told which one was used.
+
+    Returns (dx, dy, source).
     """
-    values = []
-    for trial_dir in trial_dirs:
-        offset = achieved(trial_dir)
-        if offset is None:
-            continue
-        values.append(offset)
+    values = [v for v in (arm_term(d) for d in all_dirs) if v]
+    if len(values) >= 5:
+        return (median([v[0] for v in values]),
+                median([v[1] for v in values]), "jaw minus commanded target")
+    values = [v for v in (achieved(d) for d in zero_dirs) if v]
     if len(values) < 5:
         return None
-    return (median([v[0] for v in values]), median([v[1] for v in values]))
+    return (median([v[0] for v in values]), median([v[1] for v in values]),
+            "zero-bias median, which also absorbs this pipeline's aiming error")
 
 
 def response(curve, offset):
@@ -209,6 +269,7 @@ def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     raw = collections.defaultdict(list)
+    all_dirs = []
     zero_dirs = []
     for path in sorted(glob.glob(os.path.join(sys.argv[1], "*", "trial.json"))):
         rec = json.loads(open(path, encoding="utf-8").read())
@@ -216,25 +277,25 @@ def main():
         if not m:
             continue
         trial_dir = os.path.dirname(path)
+        all_dirs.append(trial_dir)
         key = (m.group(1), int(m.group(2)))
         raw[key].append((rec.get("category", "?"), achieved(trial_dir)))
         if key[1] == 0 and rec.get("success"):
             zero_dirs.append(trial_dir)
 
-    # Measured from this batch's own zero-bias successes, never assumed and
-    # never carried over from another batch. Without a zero-bias cell there is
-    # nothing to measure it from, and guessing is how the last two x results
-    # went wrong.
-    base = measure_baseline(zero_dirs)
+    # Measured from this batch, never assumed and never carried over from
+    # another batch. Guessing is how the last two x results went wrong.
+    base = measure_baseline(all_dirs, zero_dirs)
     if base is None:
-        print("no zero-bias cell with at least 5 successes in %s - the "
-              "geometric baseline cannot be measured and offsets would be "
-              "wrong by an unknown constant. Refusing." % sys.argv[1])
+        print("%s records no commanded target and has no zero-bias cell with "
+              "at least 5 successes - the geometric baseline cannot be "
+              "measured and offsets would be wrong by an unknown constant. "
+              "Refusing." % sys.argv[1])
         return 1
     from_jaw = any(o[3] for out in raw.values() for _, o in out if o)
-    print("geometric baseline measured from %d zero-bias successes: "
-          "dx %+.2fmm, dy %+.2fmm  (reference: %s)"
-          % (len(zero_dirs), base[0], base[1],
+    print("geometric baseline: dx %+.2fmm, dy %+.2fmm  (from %s; jaw position "
+          "read at the %s)"
+          % (base[0], base[1], base[2],
              "jaw centre" if from_jaw else "gripper link origin"))
     print("")
 
