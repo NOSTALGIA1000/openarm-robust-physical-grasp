@@ -72,6 +72,32 @@ case "$AXIS" in
   # Both components positive. Opposite signs are not tested and the result
   # does not speak to them.
   xy) BIASES="${BIASES:-8 16 20}" ;;
+  # The same y levels on the other side of zero. Every open-loop cell run so
+  # far sits at y >= 0, which was listed as a limitation and has now become a
+  # blocker: stage57_reljaw put 25 of the corrected arm's 46 measurable trials
+  # at y < 0, with cell medians of -5.91mm at 128mm of camera bias and
+  # -10.67mm at 240mm. The residual the correction leaves behind lives in the
+  # half-plane the tolerance region was never measured in.
+  #
+  # Sign symmetry in y is more plausible than the x-y symmetry that died on
+  # 2026-09-15 - the two fingers are symmetric about the tool axis, which the
+  # closing and width directions are not - but plausible is what that one was
+  # too. It cost +0.800 [+0.531, +0.919] to find out.
+  #
+  # Two levels, and they are the two stage56_jaw already ran on the positive
+  # side: 16mm on the plateau and 24mm past the cliff. Run into the same
+  # OUTDIR they are in, so the pair shares one batch, one baseline and one
+  # reference frame - a cross-batch comparison here would mix the jaw centre
+  # with the link origin, which differ by about 3.5mm, on a question whose
+  # whole content is a few millimetres. 21mm is left out: stage54 has it on
+  # the positive side but under the other reference, so pairing it would cost
+  # an extra hour and a half to compare two different rulers.
+  #
+  # Prediction: 90% at -16mm and 5% at -24mm, matching the positive side
+  # within sampling error. If either departs, the region is not sign-symmetric
+  # and every corrected-arm comparison has to be made against the y < 0 curve
+  # rather than the one already published.
+  yneg) BIASES="${BIASES:-16 24}" ;;
   # Off the diagonal, to test whether the joint region is symmetric at
   # all. Every single-metric model - hypot, L1, anything on one radius -
   # requires (ex, ey) and (ey, ex) to score the same. Rectangular does
@@ -81,7 +107,7 @@ case "$AXIS" in
   # The two cells agreeing kills rectangular again; the two differing
   # kills every symmetric metric at once. PAIRS is "bx:by" in mm.
   pair) PAIRS="${PAIRS:-8:20 20:8}" ;;
-  *) echo "AXIS must be x, y, xy or pair, got '$AXIS'" >&2; exit 2 ;;
+  *) echo "AXIS must be x, y, yneg, xy or pair, got '$AXIS'" >&2; exit 2 ;;
 esac
 OUTDIR="${OUTDIR:-stage54_openloop}"
 SIDE="${SIDE:-20}"
@@ -128,14 +154,20 @@ if [ "$AXIS" = "pair" ]; then
 else
 for m in $BIASES; do
   v=$(mm_to_m "$m")
+  tag="$AXIS"
   case "$AXIS" in
     x)  bx="$v";      by="0.0000" ;;
     y)  bx="0.0000";  by="$v" ;;
     xy) bx="$v";      by="$v" ;;
+    # mm_to_m carries the sign through awk, so this is the one place the
+    # leading-zero trap of bc does not bite. The trial id spells the sign as
+    # 'n' because a minus in a directory name does not survive the analysis
+    # regex, and a cell silently dropped is worse than one named oddly.
+    yneg) bx="0.0000"; by=$(mm_to_m "-$m"); tag="yn" ;;
   esac
   echo "=== open loop, ${AXIS} bias ${m}mm (bx=$bx by=$by) ==="
   for r in $(seq "$FIRST" "$REPEATS"); do
-    bash "$EXPDIR/run_rel.sh" "$(printf 'ol_%s%03d_%s' "$AXIS" "$m" "$r")" \
+    bash "$EXPDIR/run_rel.sh" "$(printf 'ol_%s%03d_%s' "$tag" "$m" "$r")" \
       "$bx" "$by" "$OUTDIR" "$OFFX" "$OFFY" 2>&1 \
       | grep -E 'INSTABILITY|trial .* ->' | tail -2
   done

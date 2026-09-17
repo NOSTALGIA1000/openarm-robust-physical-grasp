@@ -58,7 +58,7 @@ import sys
 # CAMERA bias, which the correction is supposed to remove - it is not the
 # achieved offset and must not be read as one. Only the measured offset below
 # is comparable between the two.
-TRIAL = re.compile(r"(?:ol|rel)_(xy|x|y)(\d+)_\d+$")
+TRIAL = re.compile(r"(?:ol|rel)_(xy|x|yn|y)(\d+)_\d+$")
 
 # No hardcoded baseline. It is measured per batch by measure_baseline(), which
 # takes it from jaw minus the commanded target - see arm_term(). A constant
@@ -305,7 +305,7 @@ def main():
              for key, out in raw.items()}
 
     curves = {}
-    for axis in ("y", "x"):
+    for axis in ("y", "yn", "x"):
         pts = []
         for key in sorted(k for k in cells if k[0] == axis):
             out = cells[key]
@@ -315,7 +315,10 @@ def main():
             k = sum(1 for c, _ in out if c == "success")
             pts.append((ey if axis == "y" else ex, k / len(out)))
         curves[axis] = sorted(pts)
-        print("single-axis %s response, by achieved offset:" % axis)
+        if not pts:
+            continue
+        print("single-axis %s response, by achieved offset:"
+              % ("y (negative bias)" if axis == "yn" else axis))
         for off, rate in curves[axis]:
             print("    %6.2f mm -> %5.1f%%" % (off, 100 * rate))
 
