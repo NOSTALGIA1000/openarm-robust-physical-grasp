@@ -97,6 +97,27 @@ case "$AXIS" in
   # within sampling error. If either departs, the region is not sign-symmetric
   # and every corrected-arm comparison has to be made against the y < 0 curve
   # rather than the one already published.
+  #
+  # Outcome, 2026-09-17: -16 gave 20/20 and -24 gave 9/20, against 18/20 and
+  # 1/20 on the positive side. Read off the COMMAND that is a flat contradiction
+  # of the prediction, +0.400 [+0.133, +0.612]. Read off the ACHIEVED offset it
+  # is not a contradiction at all, because the gain from command to achieved
+  # offset differs by sign: +16 and +24 land at +17.26 and +24.83, while -16 and
+  # -24 land at -14.61 and -22.71. The negative cliff cell sits 2.1mm short of
+  # the positive one on a stretch where the curve falls from 75% to 15% in 3mm.
+  # Matched on achieved offset the two sides agree, +0.150 [-0.141, +0.409]
+  # against one interpolation of the positive curve and -0.150 [-0.414, +0.148]
+  # against the other.
+  #
+  # So the gap is narrowed, not closed: the interval is about eighty points
+  # wide because nothing was measured at a matched offset. -26mm is what closes
+  # it. The gain measured on the two negative cells is 0.913 and 0.946, so -26
+  # should land near -24.6 and can be compared with +24.83 directly instead of
+  # through an interpolation of a curve that is nearly vertical there.
+  #
+  # Prediction for -26: between 5% and 26%, the two positive readings at that
+  # offset. If it comes back at 45% again, the sides really do differ and the
+  # difference is not the offset.
   yneg) BIASES="${BIASES:-16 24}" ;;
   # Off the diagonal, to test whether the joint region is symmetric at
   # all. Every single-metric model - hypot, L1, anything on one radius -
