@@ -53,6 +53,19 @@ class Sample:
     other_contacts: int = 0
     other_geom: str = ""
     other_force: float = 0.0
+    # Gripper ORIENTATION, which the telemetry has always published and the
+    # recorder always dropped. Without it the record cannot say which way the
+    # jaws point, and on 2026-09-18 that became the question: the right arm
+    # tolerates 24.7mm in y where the left arm fails at 5%, and fails at 16mm
+    # in x where the left arm succeeds at 75%, on matched achieved offsets. A
+    # 90 degree difference in tool yaw would produce exactly that, and the
+    # orientation constraint is supposed to make it impossible - absolute_z
+    # tolerance is 0.01 rad against a fixed commanded quaternion. One of those
+    # two things is wrong and the record could not say which.
+    gripper_qw: float = float("nan")
+    gripper_qx: float = float("nan")
+    gripper_qy: float = float("nan")
+    gripper_qz: float = float("nan")
 
 
 def trial_seed(trial_id: str) -> int:
