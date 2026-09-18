@@ -1,3 +1,9 @@
+# Adapted from move_group.launch.py in the course package
+# openarm_moveit_config (declared author yhang, declared <license>BSD</license>;
+# see NOTICE and THIRD_PARTY.md section 2). 11 of that file's 19 unique
+# effective lines are still present, all of them the moveit_configs_utils
+# launch boilerplate that MoveIt's own documentation prints verbatim.
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder

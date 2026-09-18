@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """physics_mode single-trial grasp state machine.
 
+Partly derived from pick_apple.py in the course package openarm_moveit_config
+(declared author yhang, declared <license>BSD</license>; see NOTICE and
+THIRD_PARTY.md section 2). 32 of that file's 300 unique effective lines are
+still present - imports, rclpy lifecycle calls, time.sleep, bare control flow -
+of which only four carry any authored choice: the method name
+remove_protection_sphere, allowed_planning_time = 5.0,
+num_planning_attempts = 10, and the 0.01m guard on the detector message. An
+earlier version of THIRD_PARTY.md listed this package as wholly original. It
+is not, and the measurement is recorded there.
+
 There is no software attachment and no object pose publisher here. The object
 is a MuJoCo free body; if it moves with the gripper, contact moved it.
 

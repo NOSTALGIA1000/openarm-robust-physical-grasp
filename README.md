@@ -218,7 +218,7 @@ python3 -m pytest tests -q
 2. **消融与统计补测**：去 re-hover、去 ROI、去 `rel_offset` 各 n≥20，报 Wilson 区间。目前唯一的消融是 n=2。样本量依据见 `docs/statistics.md`。
 3. **余隙扫描（`sweep_clearance.sh`，已完成）**：当时以为实验室方块是 50mm（**实为 20mm，2026-09-11 更正**），而预张开间隙 60mm 只给它 **5mm/侧**——现有全部结论所依赖的 15mm/侧余隙在真机上只有三分之一。余隙 =（2·open_position − 边长）/2，可由物体尺寸与张开度**两条独立途径**改变，故本批次测的是机制而非表格：`50mm@0.040` 与 `30mm@0.030` 同为 15mm/侧，`50mm@0.050` 与 `30mm@0.040` 同为 25mm/侧，配对格点若表现一致即支持「余隙主导」。`close_position` 按 (边长−18mm)/2 缩放以固定压缩量 18mm，否则 50mm 方块会被压 38mm，夹持力与余隙混淆。
 4. **右臂覆盖 y < 0**，验证双臂互补能否覆盖整张桌面。
-5. **LICENSE（已逐项核查，剩一项未决）**：整仓采用 Apache-2.0，上游归属见 [NOTICE](NOTICE) 与 [THIRD_PARTY.md](THIRD_PARTY.md)。OpenArm（Enactic，Apache-2.0）与 `mujoco_ros2_control`（Sangtaek Lee，MIT）均已合规，被剥掉的上游版权头已恢复并附修改声明，OpenArm 网格资产本就不打包。**唯一未决项**是 `apple_detector.py`：课程包声明 `<license>BSD</license>` 但无许可文本、无版权行，版本无法确定；且我们的版本确为派生（原版 87 条唯一有效行中 80 条仍在）。**在联系作者确认版本与版权行之前不得公开发布。**
+5. **LICENSE（已逐项核查，2026-09-18 大幅修订）**：整仓采用 Apache-2.0，上游归属见 [NOTICE](NOTICE) 与 [THIRD_PARTY.md](THIRD_PARTY.md)。OpenArm（Enactic，Apache-2.0）与 `mujoco_ros2_control`（Sangtaek Lee，MIT）均已合规，被剥掉的上游版权头已恢复并附修改声明，OpenArm 网格资产本就不打包。课程包（声明 `<license>BSD</license>`，无许可文本、无版权行）派生出**六个**文件而非先前记录的一个，其中两个的来源归属原先写错了；六个都已按存留比例逐一记录并加了头部。`NOTICE` 照录 BSD-3 全文（其条件是 BSD-2 的超集，故满足任一读法），按上游 `package.xml` 的声明署名，并明说上游未提供版权行、本仓库不代为编造。**先前那条「不得公开发布」的判断建立在一个错误推理上**——不存在的版权声明无法「未能保留」——已撤销。仍建议向作者确认版本与版权行，信稿见 [docs/licence-enquiry-yhang.md](docs/licence-enquiry-yhang.md)。
 
 仍然开放但优先级较低：
 
@@ -239,7 +239,7 @@ python3 -m pytest tests -q
 
 - **OpenArm**（模型与描述）——Copyright 2025–2026 Enactic, Inc.，Apache-2.0。派生文件已恢复上游版权头并按 §4(b) 附修改声明。**STL 网格不随本仓库分发**，靠 `meshdir="meshes"` 解析到本机 OpenArm checkout。
 - **mujoco_ros2_control**——Copyright (c) 2025 Sangtaek Lee，MIT。派生文件头部即 MIT 全文，已合规；本项目加进该包的四个文件为 Apache-2.0 并已注明非派生。
-- **课程参考代码**（`apple_detector.py`，作者 yhang）——`package.xml` 声明 BSD 但**无许可文本、无版权行**，版本未决。见 THIRD_PARTY.md §2。**这是公开发布前的唯一阻塞项。**
+- **课程参考代码**（作者 yhang）——`package.xml` 声明 BSD 但**无许可文本、无版权行**。派生六个文件：`apple_detector.py` 80/87、`openarm_physics.srdf` 218/257、`physics_controllers.yaml` 32/42、`move_group_physics.launch.py` 11/19、`run_physics_grasp.launch.py` 26/71、`physics_picker.py` 32/300。六个之中只有 `apple_detector.py` 含实质作者表达（21 行：中文日志与注释、命名、三个阈值），其余共有行是框架强制的键名、机器生成的内容与教科书公式。见 THIRD_PARTY.md §2。**不再是阻塞项**；向作者的询问信仍建议发出。
 - 其余代码、脚本、文档与 `docs/results/**` 下的试验数据均为本项目自有，Apache-2.0。
 
 Apache-2.0 含显式专利授权：**写进本仓库并以此许可发布的机制，其专利许可已授予使用者**。若确定要走专利路线，应先申请后开源，或把待申请部分留在仓库之外（见 [相关工作](docs/related-work.md)）。

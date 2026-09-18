@@ -1,3 +1,10 @@
+# Adapted from run_simulation_with_detector.launch.py in the course package
+# openarm_moveit_config (declared author yhang, declared <license>BSD</license>;
+# see NOTICE and THIRD_PARTY.md section 2). 26 of that file's 71 unique
+# effective lines are still present: launch boilerplate, the standard
+# ros2_control pattern of loading controllers on process exit, and about nine
+# variable names.
+
 import os
 
 from launch import LaunchDescription

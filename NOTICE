@@ -34,8 +34,63 @@ under the Apache License, Version 2.0, like the rest of this repository.
 
 -------------------------------------------------------------------------------
 Course reference code (openarm_moveit_config, "apple" grasping demo)
-Author: yhang <1936951548@qq.com>, declared <license>BSD</license> in
-package.xml; no license text and no copyright line are present upstream, so
-the BSD variant is UNRESOLVED. See THIRD_PARTY.md.
+Declared author and maintainer: yhang <1936951548@qq.com>
+Declared license: <license>BSD</license> in package.xml
 
-  vm_sync/ros2_course_physics/src/openarm_moveit_config/launch/apple_detector.py
+Upstream ships no LICENSE file, no license text and no copyright line, and does
+not say which BSD variant is meant. Nothing is invented here to fill those gaps.
+Two consequences, set out in full in THIRD_PARTY.md section 2:
+
+  * The variant is indeterminate, so the terms of the 3-clause BSD are
+    reproduced below and honoured. Its conditions are a superset of the
+    2-clause BSD's, so honouring it satisfies either reading. The extra clause
+    binds this project, not the upstream author.
+  * There is no upstream copyright notice to retain. The condition to retain
+    one is therefore satisfied by there being nothing to retain; the list of
+    conditions and the disclaimer, which do exist as standard text, are
+    reproduced. Authorship is attributed as declared upstream.
+
+The following files in this repository are derived from that package. The
+percentage is how many of the original file's unique effective lines (blank and
+comment lines removed) are still present, measured on 2026-09-18; the command
+that measures it is in THIRD_PARTY.md.
+
+  .../openarm_moveit_config/launch/apple_detector.py               80/87  91%
+  .../openarm_moveit_config/config/openarm_physics.srdf          218/257  84%
+  .../openarm_moveit_config/launch/physics_controllers.yaml        32/42  76%
+  .../openarm_moveit_config/launch/move_group_physics.launch.py    11/19  57%
+  .../openarm_moveit_config/launch/run_physics_grasp.launch.py     26/71  36%
+  .../openarm_grasp_physics/openarm_grasp_physics/physics_picker.py 32/300 10%
+
+Everything else in those files is original to this project and is under the
+Apache License, Version 2.0.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+  3. Neither the name of the copyright holder nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  POSSIBILITY OF SUCH DAMAGE.
+
+Under clause 3, neither yhang's name nor the course's is used to endorse or
+promote this project. The references to them in this repository are statements
+of provenance.

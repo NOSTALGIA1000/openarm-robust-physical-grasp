@@ -1,15 +1,24 @@
 # Derived from the course reference implementation of openarm_moveit_config
-# (author: yhang <1936951548@qq.com>), which declares <license>BSD</license> in
-# its package.xml but ships no license text and no copyright line. The BSD
-# variant is therefore UNRESOLVED and this file MUST NOT be published until it
-# is settled; see THIRD_PARTY.md section 2.
+# (declared author and maintainer: yhang <1936951548@qq.com>), which declares
+# <license>BSD</license> in its package.xml but ships no license text and no
+# copyright line. The terms of the 3-clause BSD are reproduced and honoured in
+# NOTICE at the repository root, which also records that no copyright line was
+# supplied upstream and that none has been invented; see THIRD_PARTY.md
+# section 2 for the full reasoning and for the enquiry sent to the author.
 #
-# Of the original file's 87 unique effective lines, 80 survive here (pinhole
-# back-projection, intrinsics from fovy, the tf2 world lookup, the lock-and-
-# broadcast state machine, and the class/node names). Everything else -- the
-# gripper blob channel, the relative optical measurement, the depth band
-# parameters, noise injection and the structured logging -- is original to this
-# project and is licensed under the Apache License, Version 2.0.
+# Of the original file's 87 unique effective lines, 80 survive here. Classified
+# there: 28 are rclpy boilerplate, 31 are textbook formulas and standard API
+# idioms (pinhole back-projection, intrinsics from fovy, contour centroid,
+# tf2 point transform), and 21 are the author's own expression - the Chinese
+# log strings and comments, the class and node names, the topic and frame
+# names, and three thresholds. Those 21 are kept rather than paraphrased away:
+# removing them would reduce what has to be attributed without reducing what
+# was taken.
+#
+# Everything else -- the gripper blob channel, the relative optical
+# measurement, the depth band parameters, noise injection and the structured
+# logging -- is original to this project and is licensed under the Apache
+# License, Version 2.0.
 
 import rclpy
 from rclpy.node import Node

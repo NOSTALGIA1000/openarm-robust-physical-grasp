@@ -1,5 +1,11 @@
 # physics_mode controllers. No object controller exists in this mode: the
 # object is a MuJoCo free body and nothing is permitted to command its pose.
+#
+# Adapted from my_controllers.yaml in the course package openarm_moveit_config
+# (declared author yhang, declared <license>BSD</license>; see NOTICE and
+# THIRD_PARTY.md section 2). 32 of that file's 42 unique effective lines are
+# still present: ros2_control's own mandated keys, plugin type strings, joint
+# names from openarm_description, and two settings (max_effort, update_rate).
 controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
