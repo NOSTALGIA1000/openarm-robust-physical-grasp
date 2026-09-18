@@ -46,6 +46,13 @@ class Sample:
     jaw_z: float
     elevation: float
     drift: float
+    # Every contact with the object that is not one of the two fingers, with
+    # the name and force of the strongest. The table is normally one of them.
+    # Zero and empty on trials recorded before 2026-09-18, where a link passing
+    # through the object left no trace in the record at all.
+    other_contacts: int = 0
+    other_geom: str = ""
+    other_force: float = 0.0
 
 
 def trial_seed(trial_id: str) -> int:

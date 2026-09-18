@@ -70,6 +70,19 @@ def main():
         i = args.index("--open")
         opening = float(args[i + 1])
         del args[i:i + 2]
+    # --object-y <metres> moves the object across the robot's centreline.
+    # Needed because the two arms are not mirror images: their base poses are
+    # mirrored but every link below is identical, so a pose one arm reaches
+    # comfortably can force the other to sweep a link through the object on the
+    # way in. The right-arm smoke test of 2026-09-18 launched the cube at 11 m/s
+    # during descend with no finger contact recorded, which is what that looks
+    # like. Omitted, the scene's own y is kept, so every existing batch is
+    # unaffected.
+    object_y = None
+    if "--object-y" in args:
+        i = args.index("--object-y")
+        object_y = float(args[i + 1])
+        del args[i:i + 2]
     src = pathlib.Path(args[0])
     out = pathlib.Path(args[1])
     sides = [int(s) for s in (args[2:] or ["20", "30", "40"])]
@@ -78,7 +91,7 @@ def main():
 
     size_pat = re.compile(
         r'(name="physics_object_geom".*?size=")([\d.]+ [\d.]+ [\d.]+)(")', re.S)
-    pos_pat = re.compile(r'(<body name="physics_object" pos="[\d.]+ [\d.-]+ )([\d.]+)(")')
+    pos_pat = re.compile(r'(<body name="physics_object" pos="[\d.]+ )([\d.-]+)( )([\d.]+)(")')
     if not size_pat.search(base) or not pos_pat.search(base):
         sys.exit("could not find the object geom or its body pos in %s" % src)
 
@@ -88,9 +101,25 @@ def main():
             lambda m: "%s%.4f %.4f %.4f%s" % (m.group(1), half, half, half,
                                               m.group(3)), base, count=1)
         text = pos_pat.sub(
-            lambda m: "%s%.4f%s" % (m.group(1), TABLE_TOP_M + half, m.group(3)),
+            # The y is passed through VERBATIM when it is not being moved.
+            # Reformatting it as %.4f turned "0" into "0.0000", which is the
+            # same number and a different file, so every historical batch's
+            # recorded model_sha256 would stop matching a freshly generated
+            # scene that is physically identical to it.
+            lambda m: "%s%s%s%.4f%s" % (
+                m.group(1),
+                m.group(2) if object_y is None else "%.4f" % object_y,
+                m.group(3), TABLE_TOP_M + half, m.group(5)),
             text, count=1)
-        name = "table_scene_c%03d.xml" % s
+        # The y goes in the filename when it is moved, so a scene for one arm
+        # can never be picked up by a batch meant for the other. mm, with the
+        # sign spelled, because a minus in a filename does not survive every
+        # tool this repository pipes names through.
+        if object_y is None:
+            name = "table_scene_c%03d.xml" % s
+        else:
+            name = "table_scene_c%03d_y%s%03d.xml" % (
+                s, "m" if object_y < 0 else "p", round(abs(object_y) * 1000))
         top_depth = CAMERA_Z_M - (TABLE_TOP_M + s / 1000.0)
         (out / name).write_text(text, encoding="utf-8")
         # Sidecar with every derived value, so the rules live in one file

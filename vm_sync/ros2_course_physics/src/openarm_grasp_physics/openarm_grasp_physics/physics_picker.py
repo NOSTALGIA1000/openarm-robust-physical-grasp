@@ -476,6 +476,9 @@ class PhysicsPicker(Node):
                     jaw_z=jaw_xyz[2],
                     elevation=height,
                     drift=drift,
+                    other_contacts=summary.other_count,
+                    other_geom=summary.other_geom,
+                    other_force=summary.other_force,
                 )
             )
 
