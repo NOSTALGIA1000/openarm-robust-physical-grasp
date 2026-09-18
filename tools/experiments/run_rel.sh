@@ -7,6 +7,11 @@ EXPDIR="${EXPDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "$EXPDIR/env.sh"
 TRIAL="$1"; export CAM_BIAS_X="${2:-0.0}"; export CAM_BIAS_Y="${3:-0.0}"
 OUTDIR="${4:-stage4_relative}"; OFFX="${5:-0.0}"; OFFY="${6:-0.0}"
+# Which arm. The launch file reads GRASP_ARM for the telemetry geoms and the
+# picker takes it as a parameter; both refuse anything else. Every recorded
+# batch to date is "left", which is why that is the default.
+export GRASP_ARM="${ARM:-left}"
+case "$GRASP_ARM" in left|right) ;; *) echo "ARM must be left or right, got '$GRASP_ARM'" >&2; exit 2 ;; esac
 export DETECTOR_UNLATCHED=1
 export DETECTOR_CAM_FRAME=1
 source "$ROS_SETUP"
@@ -37,7 +42,7 @@ strip(){ sed 's/\x1b\[[0-9;]*m//g'; }
 is_active(){ ros2 control list_controllers 2>/dev/null | strip | awk -v c="$1" '$1==c && $3=="active"{f=1} END{exit !f}'; }
 for a in 1 2 3 4 5; do
   ok=1
-  for c in joint_state_broadcaster left_arm_controller left_hand_controller; do
+  for c in joint_state_broadcaster "${GRASP_ARM}_arm_controller" "${GRASP_ARM}_hand_controller"; do
     if ! is_active "$c"; then ok=0
       if ros2 control list_controllers 2>/dev/null | strip | awk -v c="$c" '$1==c{f=1} END{exit !f}'; then
         ros2 control set_controller_state "$c" inactive >/dev/null 2>&1; sleep 1
@@ -49,11 +54,12 @@ for a in 1 2 3 4 5; do
   done
   [ "$ok" = 1 ] && break; sleep 3
 done
-for c in joint_state_broadcaster left_arm_controller left_hand_controller; do
+for c in joint_state_broadcaster "${GRASP_ARM}_arm_controller" "${GRASP_ARM}_hand_controller"; do
   is_active "$c" || { echo "$TRIAL controller_abort:$c"; exit 2; }
 done
 timeout 400 ros2 run openarm_grasp_physics physics_picker --ros-args \
   -p use_sim_time:=true -p trial_id:="$TRIAL" -p output_dir:="$OUT" \
+  -p arm:="$GRASP_ARM" \
   -p use_detector_target:=true -p relative_correction:="${RELATIVE_CORRECTION:-true}" \
   -p rel_offset_x:="$OFFX" -p rel_offset_y:="$OFFY" \
   -p view_gain_gripper:="${VIEW_GAIN_GRIPPER:-0.0}" \

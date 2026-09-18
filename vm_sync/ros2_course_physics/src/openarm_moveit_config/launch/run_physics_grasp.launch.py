@@ -23,6 +23,16 @@ os.environ["MUJOCO_GL"] = "osmesa"
 
 
 def generate_launch_description():
+    # Which arm the trial drives. Read from the environment for the same reason
+    # CAM_BIAS_X/Y are: the sweeps set it per run and a launch argument would
+    # have to be threaded through every one of them. Anything other than left
+    # or right is refused here rather than producing a node that subscribes to
+    # geoms that do not exist and reports every trial as no_contact.
+    grasp_arm = os.environ.get("GRASP_ARM", "left")
+    if grasp_arm not in ("left", "right"):
+        raise ValueError(
+            "GRASP_ARM must be 'left' or 'right', got %r" % (grasp_arm,))
+
     launch_dir = os.path.dirname(__file__)
     model_dir = os.path.join(launch_dir, "..", "model")
 
@@ -53,15 +63,20 @@ def generate_launch_description():
             {"viewer_render_period": viewer_render_period},
             {"camera_period": 0.1666666667},
             {"grasp_telemetry.object_geom": "physics_object_geom"},
-            {"grasp_telemetry.gripper_body": "openarm_left_hand"},
+            {"grasp_telemetry.gripper_body":
+                "openarm_%s_hand" % grasp_arm},
             # The jaws meet midway between these two, which is the only
             # reference an offset can be measured from and still mean the
             # same thing in a different approach pose. gripper_body above
             # is the link origin and does not.
+            #
+            # The second word names the finger's side within the hand, not the
+            # arm, so the right arm's pair is openarm_right_left_finger and
+            # openarm_right_right_finger.
             {"grasp_telemetry.left_finger_geom":
-                "openarm_left_left_finger_collision"},
+                "openarm_%s_left_finger_collision" % grasp_arm},
             {"grasp_telemetry.right_finger_geom":
-                "openarm_left_right_finger_collision"},
+                "openarm_%s_right_finger_collision" % grasp_arm},
             {"grasp_telemetry.publish_every_n_steps": 10},
         ],
     )

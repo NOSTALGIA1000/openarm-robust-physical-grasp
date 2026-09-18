@@ -55,11 +55,13 @@ from openarm_grasp_physics.evaluation import (
 )
 from openarm_grasp_physics.geometry import (broyden_update,
     jacobian_from_probes, servo_step, shrink_radially, distance, elevation, relative_position)
+from openarm_grasp_physics.config import arm_names
 from openarm_grasp_physics.trial_record import Sample, TrialRecorder, trial_seed
 
-GROUP = "left_arm"
-EE_LINK = "openarm_left_hand_tcp"
-GRIPPER_ACTION = "/left_hand_controller/gripper_cmd"
+# Arm-dependent names live in config.arm_names() and reach this node through
+# the `arm` parameter. They were module constants naming the left arm, which
+# meant a right-arm run would have planned for left_arm, commanded the left
+# gripper and filtered for left joint states while claiming to be the right.
 PROTECTION_ID = "grasp_protection_sphere"
 PROTECTION_RADIUS = 0.06
 
@@ -68,6 +70,11 @@ PROTECTION_RADIUS = 0.06
 class PhysicsPicker(Node):
     def __init__(self):
         super().__init__("physics_picker")
+
+        # Declared first: several defaults below are derived from it.
+        self.declare_parameter("arm", "left")
+        self.arm = self.get_parameter("arm").value
+        self.names = arm_names(self.arm)
 
         self.declare_parameter("trial_id", "trial_000")
         self.declare_parameter("calib_bias_x", 0.0)
@@ -86,8 +93,12 @@ class PhysicsPicker(Node):
         self.declare_parameter("rehover_after_correction", True)
         self.declare_parameter("hover_yaw_tolerance", 0.01)
         self.declare_parameter("lock_ik_branch", False)
-        self.declare_parameter("branch_joint", "openarm_left_joint5")
-        self.declare_parameter("branch_centre", -0.083)
+        self.declare_parameter("branch_joint", self.names["branch_joint"])
+        # Measured on the left arm. The right arm sits at a mirrored base
+        # pose, so its joint5 branch is not at the same value; the sign flip
+        # is a guess and lock_ik_branch stays off until it is measured.
+        self.declare_parameter(
+            "branch_centre", -0.083 if self.arm == "left" else 0.083)
         self.declare_parameter("branch_tolerance", 0.08)
         self.declare_parameter("settle_before_measure_s", 0.0)
         self.declare_parameter("measure_samples", 1)
@@ -105,6 +116,11 @@ class PhysicsPicker(Node):
 
         self.config = dataclasses.replace(
             GraspConfig(),
+            # The arm and every name derived from it go into the snapshot, so a
+            # batch cannot be read later as if it came from the other arm.
+            arm=self.arm,
+            left_finger_geom=self.names["left_finger_geom"],
+            right_finger_geom=self.names["right_finger_geom"],
             calib_bias_x=self.get_parameter("calib_bias_x").value,
             calib_bias_y=self.get_parameter("calib_bias_y").value,
             vision_noise_std=self.get_parameter("vision_noise_std").value,
@@ -188,7 +204,8 @@ class PhysicsPicker(Node):
             Point, "/gripper_point_hint", 10)
 
         self.move_client = ActionClient(self, MoveGroup, "move_action")
-        self.gripper_client = ActionClient(self, GripperCommand, GRIPPER_ACTION)
+        self.gripper_client = ActionClient(
+            self, GripperCommand, self.names["gripper_action"])
 
     # ---------------- callbacks ----------------
 
@@ -208,7 +225,7 @@ class PhysicsPicker(Node):
     def _on_joints(self, msg):
         with self._lock:
             self._joints = {n: p for n, p in zip(msg.name, msg.position)
-                            if n.startswith("openarm_left_joint")}
+                            if n.startswith(self.names["joint_prefix"])}
 
     def _on_obj_cam(self, msg):
         with self._lock:
@@ -502,7 +519,7 @@ class PhysicsPicker(Node):
     def move_to(self, x, y, z, quat, tolerance=0.01, velocity_scale=0.05,
                 acceleration_scale=0.05, yaw_tolerance=None, lock_branch=False):
         goal = MoveGroup.Goal()
-        goal.request.group_name = GROUP
+        goal.request.group_name = self.names["group"]
         goal.request.num_planning_attempts = 10
         goal.request.allowed_planning_time = 5.0
         goal.request.max_velocity_scaling_factor = velocity_scale
@@ -513,7 +530,7 @@ class PhysicsPicker(Node):
 
         position = PositionConstraint()
         position.header.frame_id = "world"
-        position.link_name = EE_LINK
+        position.link_name = self.names["ee_link"]
         position.weight = 1.0
         volume = BoundingVolume()
         volume.primitives.append(
@@ -527,7 +544,7 @@ class PhysicsPicker(Node):
 
         orientation = OrientationConstraint()
         orientation.header.frame_id = "world"
-        orientation.link_name = EE_LINK
+        orientation.link_name = self.names["ee_link"]
         (
             orientation.orientation.x,
             orientation.orientation.y,

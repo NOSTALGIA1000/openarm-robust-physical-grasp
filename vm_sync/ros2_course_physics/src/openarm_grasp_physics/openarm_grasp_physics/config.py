@@ -8,8 +8,43 @@ snapshot can be written into every trial record.
 from dataclasses import asdict, dataclass
 
 
+def arm_names(arm):
+    """Every name that depends on which arm is being driven.
+
+    The two arms are not mirror images of each other. Their BASE poses are
+    mirrored - the left is Rx(-90) at y=+0.031, the right Rx(+90) at y=-0.031 -
+    but every link below the base is identical, so the right arm is a left arm
+    mounted at a mirrored base rather than a mirrored arm. The same joint
+    angles put the two hands at different places, and a pose one arm reaches
+    says nothing about whether the other reaches it. Reachability is measured,
+    not assumed; see docs/results for the right-arm smoke test.
+
+    What this function does NOT touch: the detector, which finds the gripper by
+    depth band and a point hint and never names an arm, and the object, which
+    is a free body in the scene.
+    """
+    if arm not in ("left", "right"):
+        raise ValueError("arm must be 'left' or 'right', got %r" % (arm,))
+    return {
+        "group": "%s_arm" % arm,
+        "ee_link": "openarm_%s_hand_tcp" % arm,
+        "gripper_action": "/%s_hand_controller/gripper_cmd" % arm,
+        "joint_prefix": "openarm_%s_joint" % arm,
+        "gripper_body": "openarm_%s_hand" % arm,
+        # Finger geoms are named <arm>_left_finger and <arm>_right_finger:
+        # the second word is the finger's side within the hand, not the arm.
+        "left_finger_geom": "openarm_%s_left_finger_collision" % arm,
+        "right_finger_geom": "openarm_%s_right_finger_collision" % arm,
+        "branch_joint": "openarm_%s_joint5" % arm,
+    }
+
+
 @dataclass(frozen=True)
 class GraspConfig:
+    # Which arm drives the trial. Recorded in every trial snapshot because a
+    # batch run on one arm says nothing about the other.
+    arm: str = "left"
+
     # MuJoCo geom names used for contact classification.
     object_geom: str = "physics_object_geom"
     left_finger_geom: str = "openarm_left_left_finger_collision"

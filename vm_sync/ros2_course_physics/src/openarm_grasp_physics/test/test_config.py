@@ -1,6 +1,6 @@
 import pytest
 
-from openarm_grasp_physics.config import GraspConfig
+from openarm_grasp_physics.config import GraspConfig, arm_names
 
 
 def test_defaults_match_the_declared_stage_1_thresholds():
@@ -63,3 +63,50 @@ def test_lift_command_is_separate_from_the_acceptance_threshold():
     assert config.lift_command_m == 0.030
     assert config.lift_height_m == 0.020
     assert config.lift_command_m != config.lift_height_m
+
+
+def test_arm_names_cover_every_arm_dependent_name():
+    """The names a right-arm run needs, checked against the MuJoCo model.
+
+    These were module constants in physics_picker.py naming the left arm. A
+    right-arm run would have planned for left_arm, commanded the left gripper
+    and filtered for left joint states while recording itself as the right,
+    which is the defect class this project keeps hitting: a constant valid for
+    one configuration applied to another.
+    """
+    left = arm_names("left")
+    right = arm_names("right")
+
+    assert left["group"] == "left_arm"
+    assert left["ee_link"] == "openarm_left_hand_tcp"
+    assert left["gripper_action"] == "/left_hand_controller/gripper_cmd"
+    assert left["joint_prefix"] == "openarm_left_joint"
+    assert left["gripper_body"] == "openarm_left_hand"
+    assert left["left_finger_geom"] == "openarm_left_left_finger_collision"
+    assert left["right_finger_geom"] == "openarm_left_right_finger_collision"
+    assert left["branch_joint"] == "openarm_left_joint5"
+
+    # The second word is the finger's side within the hand, not the arm, so
+    # the right arm's pair is right_left_finger and right_right_finger. Getting
+    # this wrong yields a geom that does not exist and a telemetry stream that
+    # reports jaw_centre_valid false for every frame.
+    assert right["left_finger_geom"] == "openarm_right_left_finger_collision"
+    assert right["right_finger_geom"] == "openarm_right_right_finger_collision"
+    assert right["group"] == "right_arm"
+    assert right["ee_link"] == "openarm_right_hand_tcp"
+    assert right["gripper_action"] == "/right_hand_controller/gripper_cmd"
+
+    # No key may be shared between the two: anything that does not change with
+    # the arm does not belong in here.
+    assert not set(left.values()) & set(right.values())
+
+
+def test_arm_names_refuses_anything_else():
+    for bad in ("Left", "both", "", None):
+        with pytest.raises(ValueError):
+            arm_names(bad)
+
+
+def test_arm_is_recorded_in_the_snapshot():
+    assert GraspConfig().arm == "left"
+    assert "arm" in GraspConfig().__dataclass_fields__
