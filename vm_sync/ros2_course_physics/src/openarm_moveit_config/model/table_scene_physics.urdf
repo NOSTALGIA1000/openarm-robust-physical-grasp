@@ -245,7 +245,7 @@ camera mount and object links are original to this project.
     <child link="openarm_right_right_finger"/>
     <origin xyz="0 -0.006 0.015" rpy="0 0 0"/>
     <axis xyz="0 -1 0"/>
-    <limit lower="0.0" upper="0.06" effort="333" velocity="1.0"/>
+    <limit lower="0.0" upper="0.06" effort="20" velocity="0.2"/>
     <!-- 控制爪子开合大小的 -->
     <dynamics damping="2.0" stiffness="0.5"/>
   </joint>
@@ -255,7 +255,7 @@ camera mount and object links are original to this project.
     <child link="openarm_right_left_finger"/>
     <origin xyz="0 0.006 0.015" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="0.0" upper="0.06" effort="333" velocity="1.0"/>
+    <limit lower="0.0" upper="0.06" effort="20" velocity="0.2"/>
     <!-- 控制爪子开合大小的 -->
     <dynamics damping="2.0" stiffness="0.5"/>
     <mimic joint="openarm_right_finger_joint1"/>
@@ -398,43 +398,106 @@ camera mount and object links are original to this project.
     </joint>
 
     <!-- 右臂 -->
+    <!-- Stage 3 moved the arm off direct qpos writes onto bounded PID force,
+         because plain position control teleports a joint: the solver is handed
+         a new coordinate rather than a force, so a link can appear inside
+         another body and be pushed out at whatever speed the penetration
+         implies. That migration was applied to the LEFT arm only, and nothing
+         noticed for six months because nothing drove the right arm and the
+         test only looked at openarm_left_joint%d.
+         The right-arm smoke test of 2026-09-18 is what it looks like when it
+         bites: three trials, every one no_contact, the cube leaving at 11 m/s
+         during descend with zero finger force and, once the non-finger
+         contacts were recorded, no contact sampled at all - the finger was
+         teleported into the cube and out again between two telemetry frames.
+         Gains below are copied from the mirrored left joint. The finger limit
+         was also the course original, effort 333 and velocity 1.0 against the
+         left hand's 20 and 0.2; it is now the left hand's. -->
     <joint name="openarm_right_joint1">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">40.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_right_joint2">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">40.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_right_joint3">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">27.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_right_joint4">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">27.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_right_joint5">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">7.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_right_joint6">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">7.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_right_joint7">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">10000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">200.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">7.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
     <joint name="openarm_right_finger_joint1">
-      <command_interface name="position"/>
+      <command_interface name="position_pid"/>
+      <param name="position_kp">2000.0</param>
+      <param name="position_ki">0.0</param>
+      <param name="position_kd">20.0</param>
+      <param name="position_i_max">5.0</param>
+      <param name="position_i_min">-5.0</param>
+      <param name="position_max_effort">25.0</param>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
